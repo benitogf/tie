@@ -2,11 +2,6 @@ language: go
 dist: trusty
 sudo: false
 
-env:
-  - PASTICHO_DB_USER=pasticho
-  - PASTICHO_DB_NAME=pasticho
-  - PASTICHO_DB_PASSWORD=123
-
 go:
   - 1.8.x
 
