@@ -57,6 +57,8 @@ const tableCreationQuery = `CREATE TABLE IF NOT EXISTS products
     id SERIAL,
     name TEXT NOT NULL,
     price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+    description TEXT,
+    quantity INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT products_pkey PRIMARY KEY (id)
     )`
 
@@ -113,7 +115,7 @@ func addProducts(count int) {
   }
 
   for i := 0; i < count; i++ {
-    app.DB.Exec("INSERT INTO products(name, price) VALUES($1, $2)", "Product "+strconv.Itoa(i), (i+1.0)*10)
+    app.DB.Exec("INSERT INTO products(name, price, description, quantity) VALUES($1, $2, $3, $4)", "Product "+strconv.Itoa(i), (i+1.0)*10, "not a number", 1)
   }
 }
 
@@ -153,7 +155,7 @@ func TestEmptyTable(t *testing.T) {
 func TestCreateProduct(t *testing.T) {
   clearTable()
 
-  payload := []byte(`{"name":"test product","price":11.22}`)
+  payload := []byte(`{"name":"test product","price":11.22,"description":"not a number","quantity":1}`)
 
   req, _ := http.NewRequest("POST", "/product", bytes.NewBuffer(payload))
   req.Header.Set("Authorization", "Bearer " + token)
@@ -172,8 +174,16 @@ func TestCreateProduct(t *testing.T) {
       t.Errorf("Expected product price to be '11.22'. Got '%v'", m["price"])
   }
 
+  if m["description"] != "not a number" {
+      t.Errorf("Expected product name to be 'not a number'. Got '%v'", m["description"])
+  }
+
   // the id is compared to 1.0 because JSON unmarshaling converts numbers to
   // floats, when the target is a map[string]interface{}
+  if m["quantity"] != 1.0 {
+      t.Errorf("Expected product quantity to be '1'. Got '%v'", m["quantity"])
+  }
+
   if m["id"] != 1.0 {
       t.Errorf("Expected product ID to be '1'. Got '%v'", m["id"])
   }
@@ -188,8 +198,7 @@ func TestUpdateProduct(t *testing.T) {
   response := executeRequest(req)
   var originalProduct map[string]interface{}
   json.Unmarshal(response.Body.Bytes(), &originalProduct)
-
-  payload := []byte(`{"name":"test product - updated name","price":11.22}`)
+  payload := []byte(`{"name":"test product - updated name","price":22.22,"description":"ah pasticho","quantity":0}`)
 
   req, _ = http.NewRequest("PUT", "/product/1", bytes.NewBuffer(payload))
   req.Header.Set("Authorization", "Bearer " + token)
@@ -210,6 +219,14 @@ func TestUpdateProduct(t *testing.T) {
 
   if m["price"] == originalProduct["price"] {
     t.Errorf("Expected the price to change from '%v' to '%v'. Got '%v'", originalProduct["price"], m["price"], m["price"])
+  }
+
+  if m["description"] != "ah pasticho" {
+      t.Errorf("Expected product name to be 'ah pasticho'. Got '%v'", m["description"])
+  }
+
+  if m["quantity"] != 0.0 {
+      t.Errorf("Expected product quantity to be '0'. Got '%v'", m["quantity"])
   }
 }
 
