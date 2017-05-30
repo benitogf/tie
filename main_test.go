@@ -52,14 +52,27 @@ const databaseCreateQuery = `DO
 
 const grantUserDatabaseQuery = `GRANT ALL PRIVILEGES ON DATABASE %s TO %s;`
 
-const tableCreationQuery = `CREATE TABLE IF NOT EXISTS products
+const productsCreationQuery = `CREATE TABLE IF NOT EXISTS products
     (
     id SERIAL,
     name TEXT NOT NULL,
     price NUMERIC(10,2) NOT NULL DEFAULT 0.00,
     description TEXT,
     quantity INTEGER NOT NULL DEFAULT 0,
+    files INTEGER[],
+    created DATE NOT NULL DEFAULT CURRENT_DATE,
     CONSTRAINT products_pkey PRIMARY KEY (id)
+    )`
+
+const filesCreationQuery = `CREATE TABLE IF NOT EXISTS files
+    (
+    id SERIAL,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    description TEXT,
+    data TEXT NOT NULL,
+    created DATE NOT NULL DEFAULT CURRENT_DATE,
+    CONSTRAINT files_pkey PRIMARY KEY (id)
     )`
 
 var app main.App
@@ -86,7 +99,10 @@ func initialize() {
   if err := PGDB.Close(); err != nil {
     log.Fatal(err)
   }
-  if _, err := app.DB.Exec(tableCreationQuery); err != nil {
+  if _, err := app.DB.Exec(productsCreationQuery); err != nil {
+    log.Fatal(err)
+  }
+  if _, err := app.DB.Exec(filesCreationQuery); err != nil {
     log.Fatal(err)
   }
 }
@@ -94,6 +110,8 @@ func initialize() {
 func clearTable() {
   app.DB.Exec("DELETE FROM products")
   app.DB.Exec("ALTER SEQUENCE products_id_seq RESTART WITH 1")
+  app.DB.Exec("DELETE FROM files")
+  app.DB.Exec("ALTER SEQUENCE files_id_seq RESTART WITH 1")
 }
 
 func executeRequest(req *http.Request) *httptest.ResponseRecorder {
@@ -115,7 +133,19 @@ func addProducts(count int) {
   }
 
   for i := 0; i < count; i++ {
-    app.DB.Exec("INSERT INTO products(name, price, description, quantity) VALUES($1, $2, $3, $4)", "Product "+strconv.Itoa(i), (i+1.0)*10, "not a number", 1)
+    if _, err := app.DB.Exec("INSERT INTO products(name, price, description, quantity, files) VALUES($1, $2, $3, $4, $5)", "Product "+strconv.Itoa(i), (i+1.0)*10, "not a number", 1, "{1,2}"); err != nil {
+      log.Fatal(err)
+    }
+  }
+}
+
+func addFiles(count int) {
+  if count < 1 {
+    count = 1
+  }
+
+  for i := 0; i < count; i++ {
+    app.DB.Exec("INSERT INTO files(name, type, description, data) VALUES($1, $2, $3, $4)", "File"+strconv.Itoa(i)+".gif", "image/gif", "not a number", "R0lGODdhBQAFAIACAAAAAP/eACwAAAAABQAFAAACCIwPkWerClIBADs=")
   }
 }
 
@@ -155,7 +185,7 @@ func TestEmptyTable(t *testing.T) {
 func TestCreateProduct(t *testing.T) {
   clearTable()
 
-  payload := []byte(`{"name":"test product","price":11.22,"description":"not a number","quantity":1}`)
+  payload := []byte(`{"name":"test product","price":11.22,"description":"not a number","quantity":1,"files":[1,2]}`)
 
   req, _ := http.NewRequest("POST", "/product", bytes.NewBuffer(payload))
   req.Header.Set("Authorization", "Bearer " + token)
@@ -184,6 +214,12 @@ func TestCreateProduct(t *testing.T) {
       t.Errorf("Expected product quantity to be '1'. Got '%v'", m["quantity"])
   }
 
+  // the id is compared to 1.0 because JSON unmarshaling converts numbers to
+  // floats, when the target is a map[string]interface{
+  if m["files"].([]interface{})[0] != 1.0 {
+      t.Errorf("Expected product first file to be 1. Got '%v'", m["files"].([]interface{})[0])
+  }
+
   if m["id"] != 1.0 {
       t.Errorf("Expected product ID to be '1'. Got '%v'", m["id"])
   }
@@ -198,7 +234,7 @@ func TestUpdateProduct(t *testing.T) {
   response := executeRequest(req)
   var originalProduct map[string]interface{}
   json.Unmarshal(response.Body.Bytes(), &originalProduct)
-  payload := []byte(`{"name":"test product - updated name","price":22.22,"description":"ah pasticho","quantity":0}`)
+  payload := []byte(`{"name":"test product - updated name","price":22.22,"description":"ah pasticho","quantity":0,"files":[3,4]}`)
 
   req, _ = http.NewRequest("PUT", "/product/1", bytes.NewBuffer(payload))
   req.Header.Set("Authorization", "Bearer " + token)
@@ -225,6 +261,12 @@ func TestUpdateProduct(t *testing.T) {
       t.Errorf("Expected product name to be 'ah pasticho'. Got '%v'", m["description"])
   }
 
+  // the id is compared to 1.0 because JSON unmarshaling converts numbers to
+  // floats, when the target is a map[string]interface{
+  if m["files"].([]interface{})[1] != 4.0 {
+      t.Errorf("Expected product second file to be 4. Got '%v'", m["files"].([]interface{})[0])
+  }
+
   if m["quantity"] != 0.0 {
       t.Errorf("Expected product quantity to be '0'. Got '%v'", m["quantity"])
   }
@@ -242,7 +284,6 @@ func TestDeleteProduct(t *testing.T) {
   req, _ = http.NewRequest("DELETE", "/product/1", nil)
   req.Header.Set("Authorization", "Bearer " + token)
   response = executeRequest(req)
-
   checkResponseCode(t, http.StatusOK, response.Code)
 
   req, _ = http.NewRequest("GET", "/product/1", nil)
@@ -276,6 +317,68 @@ func TestGetNonExistentProduct(t *testing.T) {
   if m["message"] != "Product not found" {
     t.Errorf("Expected the 'error' key of the response to be set to 'Product not found'. Got '%s'", m["error"])
   }
+}
+
+func TestCreateFile(t *testing.T) {
+  clearTable()
+
+  payload := []byte(`{"name":"test_file.png","type":"image/gif","description":"not a number","data":"R0lGODdhBQAFAIACAAAAAP/eACwAAAAABQAFAAACCIwPkWerClIBADs="}`)
+
+  req, _ := http.NewRequest("POST", "/file", bytes.NewBuffer(payload))
+  req.Header.Set("Authorization", "Bearer " + token)
+  response := executeRequest(req)
+
+  checkResponseCode(t, http.StatusCreated, response.Code)
+
+  var m map[string]interface{}
+  json.Unmarshal(response.Body.Bytes(), &m)
+
+  if m["name"] != "test_file.png" {
+    t.Errorf("Expected product name to be 'test_file.png'. Got '%v'", m["name"])
+  }
+
+  if m["type"] != "image/gif" {
+    t.Errorf("Expected product name to be 'image/gif'. Got '%v'", m["type"])
+  }
+
+  if m["description"] != "not a number" {
+      t.Errorf("Expected product name to be 'not a number'. Got '%v'", m["description"])
+  }
+
+  if m["data"] != "R0lGODdhBQAFAIACAAAAAP/eACwAAAAABQAFAAACCIwPkWerClIBADs=" {
+    t.Errorf("Expected product name to be 'R0lGODdhBQAFAIACAAAAAP/eACwAAAAABQAFAAACCIwPkWerClIBADs='. Got '%v'", m["data"])
+  }
+}
+
+func TestGetFile(t *testing.T) {
+  clearTable()
+  addFiles(1)
+
+  req, _ := http.NewRequest("GET", "/file/1", nil)
+  req.Header.Set("Authorization", "Bearer " + token)
+  response := executeRequest(req)
+
+  checkResponseCode(t, http.StatusOK, response.Code)
+}
+
+func TestDeleteFile(t *testing.T) {
+  clearTable()
+  addFiles(1)
+
+  req, _ := http.NewRequest("GET", "/file/1", nil)
+  req.Header.Set("Authorization", "Bearer " + token)
+  response := executeRequest(req)
+  checkResponseCode(t, http.StatusOK, response.Code)
+
+  req, _ = http.NewRequest("DELETE", "/file/1", nil)
+  req.Header.Set("Authorization", "Bearer " + token)
+  response = executeRequest(req)
+  checkResponseCode(t, http.StatusOK, response.Code)
+
+  req, _ = http.NewRequest("GET", "/file/1", nil)
+  req.Header.Set("Authorization", "Bearer " + token)
+  response = executeRequest(req)
+  checkResponseCode(t, http.StatusNotFound, response.Code)
 }
 
 func TestMain(m *testing.M) {

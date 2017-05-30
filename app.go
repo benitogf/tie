@@ -32,14 +32,17 @@ func (app *App) Run(addr *string) {
 }
 
 func (app *App) initializeRoutes() {
-    app.Router.HandleFunc("/products", tokenAuth.HandleFunc(app.getProducts)).Methods("GET")
-    app.Router.HandleFunc("/product", tokenAuth.HandleFunc(app.createProduct)).Methods("POST")
-    app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.getProduct)).Methods("GET")
-    app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.updateProduct)).Methods("PUT")
-    app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.deleteProduct)).Methods("DELETE")
-    app.Router.HandleFunc("/authorize", app.authorize)
-  	app.Router.HandleFunc("/restricted", tokenAuth.HandleFunc(app.pasticho))
-  	app.Router.HandleFunc("/ws", app.wss)
+  app.Router.HandleFunc("/file", tokenAuth.HandleFunc(app.createFile)).Methods("POST")
+  app.Router.HandleFunc("/file/{id:[0-9]+}", tokenAuth.HandleFunc(app.getFile)).Methods("GET")
+  app.Router.HandleFunc("/file/{id:[0-9]+}", tokenAuth.HandleFunc(app.deleteFile)).Methods("DELETE")
+  app.Router.HandleFunc("/products", tokenAuth.HandleFunc(app.getProducts)).Methods("GET")
+  app.Router.HandleFunc("/product", tokenAuth.HandleFunc(app.createProduct)).Methods("POST")
+  app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.getProduct)).Methods("GET")
+  app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.updateProduct)).Methods("PUT")
+  app.Router.HandleFunc("/product/{id:[0-9]+}", tokenAuth.HandleFunc(app.deleteProduct)).Methods("DELETE")
+  app.Router.HandleFunc("/authorize", app.authorize)
+  app.Router.HandleFunc("/restricted", tokenAuth.HandleFunc(app.pasticho))
+  app.Router.HandleFunc("/ws", app.wss)
 }
 
 func (a *App) pasticho(w http.ResponseWriter, req *http.Request) {

@@ -11,7 +11,7 @@ import (
 
 func (a *App) getProduct(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    id, err := strconv.Atoi(vars["id"])
+    id, err := strconv.ParseInt(vars["id"],10,64)
     if err != nil {
         respondWithError(w, http.StatusBadRequest, "Invalid product ID")
         return
@@ -55,7 +55,7 @@ func (app *App) createProduct(w http.ResponseWriter, r *http.Request) {
     var p product
     decoder := json.NewDecoder(r.Body)
     if err := decoder.Decode(&p); err != nil {
-        respondWithError(w, http.StatusBadRequest, "Invalid request payload")
+        respondWithError(w, http.StatusBadRequest, err.Error())
         return
     }
     defer r.Body.Close()
@@ -70,7 +70,7 @@ func (app *App) createProduct(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) updateProduct(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    id, err := strconv.Atoi(vars["id"])
+    id, err := strconv.ParseInt(vars["id"],10,64)
     if err != nil {
         respondWithError(w, http.StatusBadRequest, "Invalid product ID")
         return
@@ -95,7 +95,7 @@ func (a *App) updateProduct(w http.ResponseWriter, r *http.Request) {
 
 func (a *App) deleteProduct(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
-    id, err := strconv.Atoi(vars["id"])
+    id, err := strconv.ParseInt(vars["id"],10,64)
     if err != nil {
         respondWithError(w, http.StatusBadRequest, "Invalid Product ID")
         return
