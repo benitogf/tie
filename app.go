@@ -7,6 +7,7 @@ import (
     "database/sql"
     "github.com/gorilla/mux"
     "github.com/benitogf/pasticho/auth"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
     _ "github.com/lib/pq"
 )
 
@@ -28,6 +29,7 @@ func (app *App) Initialize(user, password, dbname string) {
 }
 
 func (app *App) Run(addr *string) {
+    stdout.Printf("Using %s as address to listen.\n", *addr)
     log.Fatal(http.ListenAndServe(*addr, app.Router))
 }
 
@@ -43,6 +45,7 @@ func (app *App) initializeRoutes() {
   app.Router.HandleFunc("/authorize", app.authorize)
   app.Router.HandleFunc("/restricted", tokenAuth.HandleFunc(app.pasticho))
   app.Router.HandleFunc("/ws", app.wss)
+  app.Router.Handle("/metrics", promhttp.Handler())
 }
 
 func (a *App) pasticho(w http.ResponseWriter, req *http.Request) {
