@@ -1,6 +1,7 @@
 package main
 
 import (
+    "fmt"
   	"net/http"
     "encoding/json"
     "github.com/gorilla/mux"
@@ -81,7 +82,9 @@ func (a *App) get(w http.ResponseWriter, r *http.Request) {
 
     db, err := leveldb.OpenFile(*dbpath, nil)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error reading the database")
+        response := fmt.Sprintf("Error reading the database %s\n", err)
+        stdout.Printf(response)
+        respondWithError(w, http.StatusInternalServerError, response)
         return
     }
 
@@ -107,7 +110,9 @@ func (a *App) exists(w http.ResponseWriter, r *http.Request) {
 
     db, err := leveldb.OpenFile(*dbpath, nil)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error reading the database")
+        response := fmt.Sprintf("Error reading the database %s\n", err)
+        stdout.Printf(response)
+        respondWithError(w, http.StatusInternalServerError, response)
         return
     }
 
@@ -131,7 +136,9 @@ func (a *App) free(w http.ResponseWriter, r *http.Request) {
 
     db, err := leveldb.OpenFile(*dbpath, nil)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error reading the database")
+        response := fmt.Sprintf("Error reading the database %s\n", err)
+        stdout.Printf(response)
+        respondWithError(w, http.StatusInternalServerError, response)
         return
     }
 
@@ -157,7 +164,9 @@ func (a *App) set(w http.ResponseWriter, r *http.Request) {
 
     db, err := leveldb.OpenFile(*dbpath, nil)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error reading the database")
+        response := fmt.Sprintf("Error reading the database %s\n", err)
+        stdout.Printf(response)
+        respondWithError(w, http.StatusInternalServerError, response)
         return
     }
 
@@ -181,7 +190,9 @@ func (a *App) del(w http.ResponseWriter, r *http.Request) {
 
     db, err := leveldb.OpenFile(*dbpath, nil)
     if err != nil {
-        respondWithError(w, http.StatusInternalServerError, "Error reading the database")
+        response := fmt.Sprintf("Error reading the database %s\n", err)
+        stdout.Printf(response)
+        respondWithError(w, http.StatusInternalServerError, response)
         return
     }
 
