@@ -87,6 +87,7 @@ func (a *App) get(w http.ResponseWriter, r *http.Request) {
         respondWithError(w, http.StatusInternalServerError, response)
         return
     }
+    defer db.Close()
 
     data, err := db.Get([]byte(vars["key"]), nil)
     if err != nil {
@@ -97,8 +98,6 @@ func (a *App) get(w http.ResponseWriter, r *http.Request) {
     i := item{Key: vars["key"], Value: string(data[:])}
 
     respondWithJSON(w, http.StatusOK, i)
-
-    defer db.Close()
 }
 
 func (a *App) exists(w http.ResponseWriter, r *http.Request) {
@@ -115,6 +114,7 @@ func (a *App) exists(w http.ResponseWriter, r *http.Request) {
         respondWithError(w, http.StatusInternalServerError, response)
         return
     }
+    defer db.Close()
 
     _, err = db.Get([]byte(vars["key"]), nil)
     if err != nil {
@@ -123,8 +123,6 @@ func (a *App) exists(w http.ResponseWriter, r *http.Request) {
     }
 
     respondWithJSON(w, http.StatusOK, "Item exists")
-
-    defer db.Close()
 }
 
 func (a *App) free(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +139,7 @@ func (a *App) free(w http.ResponseWriter, r *http.Request) {
         respondWithError(w, http.StatusInternalServerError, response)
         return
     }
+    defer db.Close()
 
     _, err = db.Get([]byte(vars["key"]), nil)
     if err != nil {
@@ -149,8 +148,6 @@ func (a *App) free(w http.ResponseWriter, r *http.Request) {
     }
 
     respondWithJSON(w, http.StatusExpectationFailed, "Item exists")
-
-    defer db.Close()
 }
 
 func (a *App) set(w http.ResponseWriter, r *http.Request) {
@@ -169,6 +166,7 @@ func (a *App) set(w http.ResponseWriter, r *http.Request) {
         respondWithError(w, http.StatusInternalServerError, response)
         return
     }
+    defer db.Close()
 
     err = db.Put([]byte(f.Key), []byte(f.Value), nil)
     if err != nil {
@@ -177,8 +175,6 @@ func (a *App) set(w http.ResponseWriter, r *http.Request) {
     }
 
     respondWithJSON(w, http.StatusCreated, f)
-
-    defer db.Close()
 }
 
 func (a *App) del(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +191,7 @@ func (a *App) del(w http.ResponseWriter, r *http.Request) {
         respondWithError(w, http.StatusInternalServerError, response)
         return
     }
+    defer db.Close()
 
     err = db.Delete([]byte(vars["key"]), nil)
     if err != nil {
@@ -203,6 +200,4 @@ func (a *App) del(w http.ResponseWriter, r *http.Request) {
     }
 
     respondWithJSON(w, http.StatusOK, "Item deleted")
-
-    defer db.Close()
 }
