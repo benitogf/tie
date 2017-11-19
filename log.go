@@ -1,8 +1,8 @@
 package main
 
 import (
-	"log"
-	"os"
+    "log"
+    "os"
 )
 
 var stdout = log.New(os.Stdout, "[pasticho] ", 0)

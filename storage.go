@@ -2,7 +2,7 @@ package main
 
 import (
     "fmt"
-  	"net/http"
+    "net/http"
     "encoding/json"
     "github.com/gorilla/mux"
     "github.com/syndtr/goleveldb/leveldb"
@@ -80,7 +80,7 @@ func (a *App) get(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    db, err := leveldb.OpenFile(*dbpath, nil)
+    db, err := leveldb.OpenFile(*ldbpath, nil)
     if err != nil {
         response := fmt.Sprintf("Error reading the database %s\n", err)
         stdout.Printf(response)
@@ -107,7 +107,7 @@ func (a *App) exists(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    db, err := leveldb.OpenFile(*dbpath, nil)
+    db, err := leveldb.OpenFile(*ldbpath, nil)
     if err != nil {
         response := fmt.Sprintf("Error reading the database %s\n", err)
         stdout.Printf(response)
@@ -132,7 +132,7 @@ func (a *App) free(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    db, err := leveldb.OpenFile(*dbpath, nil)
+    db, err := leveldb.OpenFile(*ldbpath, nil)
     if err != nil {
         response := fmt.Sprintf("Error reading the database %s\n", err)
         stdout.Printf(response)
@@ -159,7 +159,7 @@ func (a *App) set(w http.ResponseWriter, r *http.Request) {
     }
     defer r.Body.Close()
 
-    db, err := leveldb.OpenFile(*dbpath, nil)
+    db, err := leveldb.OpenFile(*ldbpath, nil)
     if err != nil {
         response := fmt.Sprintf("Error reading the database %s\n", err)
         stdout.Printf(response)
@@ -184,7 +184,7 @@ func (a *App) del(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    db, err := leveldb.OpenFile(*dbpath, nil)
+    db, err := leveldb.OpenFile(*ldbpath, nil)
     if err != nil {
         response := fmt.Sprintf("Error reading the database %s\n", err)
         stdout.Printf(response)
