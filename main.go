@@ -2,11 +2,12 @@ package main
 
 import (
     "flag"
-		"os"
+	"os"
     "log"
 )
 
 var addr = flag.String("addr", "localhost:9060", "http service address")
+var dbpath = flag.String("dbpath", "storage/db", "http service address")
 
 func main() {
 

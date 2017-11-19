@@ -381,6 +381,50 @@ func TestDeleteFile(t *testing.T) {
   checkResponseCode(t, http.StatusNotFound, response.Code)
 }
 
+func TestStorageSet(t *testing.T) {
+  payload := []byte(`{"key":"human","value":"reasonable"}`)
+
+  req, _ := http.NewRequest("POST", "/set", bytes.NewBuffer(payload))
+  req.Header.Set("Authorization", "Bearer " + token)
+  response := executeRequest(req)
+
+  checkResponseCode(t, http.StatusCreated, response.Code)
+
+  var m map[string]interface{}
+  json.Unmarshal(response.Body.Bytes(), &m)
+
+  if m["value"] != "reasonable" {
+      t.Errorf("Expected human to be 'reasonable'. Got '%v'", m["key"])
+  }
+}
+
+func TestStorageGet(t *testing.T) {
+  req, _ := http.NewRequest("GET", "/get/human", nil)
+  response := executeRequest(req)
+
+  checkResponseCode(t, http.StatusOK, response.Code)
+
+  var m map[string]interface{}
+  json.Unmarshal(response.Body.Bytes(), &m)
+
+  if m["value"] != "reasonable" {
+      t.Errorf("Expected human to be 'reasonable'. Got '%v'", m["value"])
+  }
+}
+
+func TestStorageDel(t *testing.T) {
+  req, _ := http.NewRequest("DELETE", "/del/human", nil)
+  req.Header.Set("Authorization", "Bearer " + token)
+  response := executeRequest(req)
+
+  checkResponseCode(t, http.StatusOK, response.Code)
+
+  req, _ = http.NewRequest("GET", "/get/human", nil)
+  response = executeRequest(req)
+
+  checkResponseCode(t, http.StatusNotFound, response.Code)
+}
+
 func TestMain(m *testing.M) {
   app = main.App{}
   app.Initialize(

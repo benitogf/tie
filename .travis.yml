@@ -12,6 +12,8 @@ install:
   - go get github.com/dgrijalva/jwt-go
   - go get github.com/lib/pq
   - go get github.com/prometheus/client_golang/prometheus
+  - go get github.com/golang/snappy
+  - go get github.com/syndtr/goleveldb
 
 services:
   - postgresql

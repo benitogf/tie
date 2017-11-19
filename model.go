@@ -24,6 +24,11 @@ type file struct {
     Created string `json:"created"`
 }
 
+type item struct {
+    Key  string  `json:"key"`
+    Value string `json:"value"`
+}
+
 // Products
 
 func (p *product) createProduct(db *sql.DB) error {
