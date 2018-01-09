@@ -1,9 +1,9 @@
-# Pasticho
+# Tie
 
 [![Build Status][build-image]][build-url]
 
 
-[build-url]: https://travis-ci.org/benitogf/pasticho
+[build-url]: https://travis-ci.com/benitogf/pasticho
 [build-image]: https://img.shields.io/travis/benitogf/pasticho/master.svg?style=flat-square
 
-Go api boilerplate, layers
+Api for suit
