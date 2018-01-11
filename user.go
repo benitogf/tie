@@ -2,11 +2,11 @@ package main
 
 import (
     "log"
-      "fmt"
+    "fmt"
     "time"
     "net/http"
-      "encoding/json"
-    "github.com/benitogf/pasticho/auth"
+    "encoding/json"
+    "github.com/benitogf/tie/auth"
 )
 
 type User struct {
@@ -14,6 +14,7 @@ type User struct {
     Name     string    `json:"name"`
     Account  string    `json:"account"`
     Password string    `json:"password"`
+    Role     string    `json:"role"`
     Host     string    `json:"host"`
     Token    string    `json:"token"`
     Expiry   string    `json:"expiry"`
@@ -30,10 +31,19 @@ func GetUser(account string) User {
     t := jwtstore.NewToken("")
     t.SetClaim("id", account)
     var user User
-    user.Name = *authname
-    user.Id = *authid
-    user.Account = *authaccount
-    user.Password = *authpassword
+    if (account == *adminaccount) {
+      user.Name = *adminname
+      user.Id = *adminid
+      user.Account = *adminaccount
+      user.Password = *adminpassword
+      user.Role = "admin"
+    } else {
+      user.Name = *username
+      user.Id = *userid
+      user.Account = *useraccount
+      user.Password = *userpassword
+      user.Role = "user"
+    }
     user.Token = t.String()
     return user
 }
@@ -55,7 +65,7 @@ func (a *App) authorize(w http.ResponseWriter, req *http.Request) {
     case "POST":
         w.Header().Add("content-type", "application/json")
         credentials := GetCredentials(w, req)
-        if (credentials["account"] == *authaccount && credentials["password"] == *authpassword) {
+        if ((credentials["account"] == *adminaccount && credentials["password"] == *adminpassword) || (credentials["account"] == *useraccount && credentials["password"] == *userpassword)) {
             user := GetUser(credentials["account"].(string))
             enc := json.NewEncoder(w)
             enc.Encode(&user)

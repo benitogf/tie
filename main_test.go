@@ -11,13 +11,13 @@ import (
     "database/sql"
     "encoding/json"
     "net/http/httptest"
-    "github.com/benitogf/pasticho"
+    "github.com/benitogf/tie"
     _ "github.com/lib/pq"
 )
 
-var DB_USER = os.Getenv("PASTICHO_DB_USER")
-var DB_NAME = os.Getenv("PASTICHO_DB_NAME")
-var DB_PASSWORD = os.Getenv("PASTICHO_DB_PASSWORD")
+var DB_USER = os.Getenv("TIE_DB_USER")
+var DB_NAME = os.Getenv("TIE_DB_NAME")
+var DB_PASSWORD = os.Getenv("TIE_DB_PASSWORD")
 var PGPW = os.Getenv("PG_PASSWORD")
 
 const userCreateQuery = `DO
@@ -149,7 +149,7 @@ func addFiles(count int) {
 }
 
 func TestAuthorize(t *testing.T) {
-    payload := []byte(`{"account":"pasticho","password":"202cb962ac59075b964b07152d234b70"}`)
+    payload := []byte(`{"account":"admin","password":"202cb962ac59075b964b07152d234b70"}`)
     req, _ := http.NewRequest("POST", "/authorize", bytes.NewBuffer(payload))
     response := executeRequest(req)
 
