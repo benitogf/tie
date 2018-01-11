@@ -8,7 +8,7 @@ import (
       "net/http"
     "database/sql"
     "github.com/gorilla/mux"
-    "github.com/benitogf/pasticho/auth"
+    "github.com/benitogf/tie/auth"
     "github.com/prometheus/client_golang/prometheus"
     "github.com/prometheus/client_golang/prometheus/promhttp"
     _ "github.com/lib/pq"
