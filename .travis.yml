@@ -1,19 +1,15 @@
 language: go
-dist: trusty
-sudo: false
+os:
+  - linux
 
 go:
-  - 1.8.x
+  - 1.11.x
 
 install:
   - go get github.com/gorilla/mux
-  - go get github.com/gorilla/websocket
   - go get github.com/gorilla/context
-  - go get github.com/dgrijalva/jwt-go
-  - go get github.com/lib/pq
-  - go get github.com/prometheus/client_golang/prometheus
-  - go get github.com/golang/snappy
-  - go get github.com/syndtr/goleveldb/leveldb
+  - go get github.com/benitogf/jwt
 
-services:
-  - postgresql
+script:
+  - go vet ./...
+  - go test -v -coverprofile cover.out -count 1 -failfast -race -bench .

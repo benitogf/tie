@@ -1,32 +1,42 @@
 package main
 
 import (
-    "flag"
-    "os"
-    "log"
+	"flag"
+	"log"
+	"time"
+
+	"github.com/benitogf/samo"
+	"github.com/benitogf/tie/auth"
+	"github.com/gorilla/mux"
 )
 
-var address = flag.String("address", "localhost:9060", "http service address")
-var ldbpath = flag.String("ldbpath", "storage/db", "leveldb storage path")
-var authkey = flag.String("authkey", "my-secret-key", "secret key for auth key")
-// fixed admin
-var adminname = flag.String("adminname", "Admin", "admin name")
-var adminid = flag.String("adminid", "000", "admin id")
-var adminaccount = flag.String("adminaccount", "admin", "admin account name(login)")
-var adminpassword = flag.String("adminpassword", "202cb962ac59075b964b07152d234b70", "admin password")
-// fixed user
-var username = flag.String("username", "User", "user name")
-var userid = flag.String("userid", "001", "user id")
-var useraccount = flag.String("useraccount", "user", "user account name(login)")
-var userpassword = flag.String("userpassword", "202cb962ac59075b964b07152d234b70", "user password")
+var key = flag.String("key", "a-secret-key", "secret key for tokens")
+var path = flag.String("path", "data/auth", "user storage path")
 
 func main() {
-    flag.Parse()
-    log.SetFlags(0)
-    app := App{}
-    app.Initialize(
-            os.Getenv("TIE_DB_USER"),
-            os.Getenv("TIE_DB_PASSWORD"),
-            os.Getenv("TIE_DB_NAME"))
-    app.Run(address)
+	// create a separate data store for auth
+	dataStore := &samo.LevelDbStorage{
+		Path:    *path,
+		Storage: &samo.Storage{Active: false},
+	}
+	err := dataStore.Start("/")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// create a tokenAuth
+	tokenAuth := auth.NewTokenAuth(
+		auth.NewJwtStore(*key, time.Minute*10),
+		dataStore,
+	)
+
+	// Server
+	server := &samo.Server{}
+	server.Silence = false
+	server.Audit = tokenAuth.Verify
+	server.Router = mux.NewRouter()
+	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
+	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
+	server.Start("localhost:8800")
+	server.WaitClose()
 }

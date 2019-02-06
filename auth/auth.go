@@ -1,146 +1,306 @@
 package auth
 
 import (
-    "errors"
-    "fmt"
-    "github.com/gorilla/context"
-    "net/http"
-    "strings"
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/benitogf/samo"
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/gorilla/context"
 )
 
+// User :
+type User struct {
+	Name     string `json:"name"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
+}
+
+// Credentials :
+type Credentials struct {
+	Account  string `json:"account"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
+// TokenAuth :
 type TokenAuth struct {
-    handler             http.Handler
-    store               TokenStore
-    getter              TokenGetter
-    UnauthorizedHandler http.HandlerFunc
+	tokenStore          *JwtStore
+	store               samo.Database
+	getter              TokenGetter
+	UnauthorizedHandler http.HandlerFunc
 }
 
+// TokenGetter :
 type TokenGetter interface {
-    GetTokenFromRequest(req *http.Request) string
+	GetTokenFromRequest(req *http.Request) string
 }
 
-type TokenStore interface {
-    CheckToken(token string) (Token, error)
-}
-
+// Token :
 type Token interface {
-    IsExpired() bool
-    fmt.Stringer
-    ClaimGetter
+	IsExpired() bool
+	fmt.Stringer
+	ClaimGetter
 }
 
+// ClaimSetter :
 type ClaimSetter interface {
-    SetClaim(string, interface{}) ClaimSetter
+	SetClaim(string, interface{}) ClaimSetter
 }
 
+// ClaimGetter :
 type ClaimGetter interface {
-    Claims(string) interface{}
+	Claims(string) interface{}
 }
 
+// BearerGetter :
+type BearerGetter struct {
+	Header string
+}
+
+// DefaultUnauthorizedHandler :
 func DefaultUnauthorizedHandler(w http.ResponseWriter, req *http.Request) {
-    w.WriteHeader(401)
-    fmt.Fprint(w, "unauthorized")
+	w.WriteHeader(http.StatusUnauthorized)
+	fmt.Fprint(w, "unauthorized")
 }
 
-// type QueryStringTokenGetter struct {
-//     Parameter string
-// }
-//
-// func (q QueryStringTokenGetter) GetTokenFromRequest(req *http.Request) string {
-//     log.Println("header:", req.Header)
-//     return req.URL.Query().Get(q.Parameter)
-// }
-//
-// func NewQueryStringTokenGetter(parameter string) *QueryStringTokenGetter {
-//     return &QueryStringTokenGetter{
-//         Parameter: parameter,
-//     }
-// }
-
-type BearerGetter struct{
-  Header string
-}
-
+// GetTokenFromRequest :
 func (b *BearerGetter) GetTokenFromRequest(req *http.Request) string {
-    // log.Println("header:", req.Header)
-    authStr := req.Header.Get(b.Header)
-    if !strings.HasPrefix(authStr, "Bearer ") {
-        return ""
-    }
+	// log.Println("header:", req.Header)
+	authStr := req.Header.Get(b.Header)
+	if !strings.HasPrefix(authStr, "Bearer ") {
+		return ""
+	}
 
-    return authStr[7:]
+	return authStr[7:]
 }
 
+// NewHeaderBearerTokenGetter :
 func NewHeaderBearerTokenGetter(header string) *BearerGetter {
-    return &BearerGetter{
-        Header: header,
-    }
+	return &BearerGetter{
+		Header: header,
+	}
 }
 
-/*
-    Returns a TokenAuth object implemting Handler interface
-
-    if a handler is given it proxies the request to the handler
-
-    if a unauthorizedHandler is provided, unauthorized requests will be handled by this HandlerFunc,
-    otherwise a default unauthorized handler is used.
-
-    store is the TokenStore that stores and verify the tokens
-*/
-func NewTokenAuth(handler http.Handler, unauthorizedHandler http.HandlerFunc, store TokenStore, getter TokenGetter) *TokenAuth {
-    t := &TokenAuth{
-        handler:             handler,
-        store:               store,
-        getter:              getter,
-        UnauthorizedHandler: unauthorizedHandler,
-    }
-    if t.getter == nil {
-        t.getter = NewHeaderBearerTokenGetter("Authorization")
-    }
-    if t.UnauthorizedHandler == nil {
-        t.UnauthorizedHandler = DefaultUnauthorizedHandler
-    }
-    return t
+// NewTokenAuth :
+// Returns a TokenAuth object implemting Handler interface
+// if a handler is given it proxies the request to the handler
+// if a unauthorizedHandler is provided, unauthorized requests will be handled by this HandlerFunc,
+// otherwise a default unauthorized handler is used.
+// store is the TokenStore that stores and verify the tokens
+func NewTokenAuth(tokenStore *JwtStore, store samo.Database) *TokenAuth {
+	t := &TokenAuth{
+		tokenStore: tokenStore,
+		store:      store,
+	}
+	t.getter = NewHeaderBearerTokenGetter("Authorization")
+	t.UnauthorizedHandler = DefaultUnauthorizedHandler
+	return t
 }
 
-/* wrap a HandlerFunc to be authenticated */
-func (t *TokenAuth) HandleFunc(handlerFunc http.HandlerFunc) http.HandlerFunc {
-    return func(w http.ResponseWriter, req *http.Request) {
-        token, err := t.Authenticate(req)
-        if err != nil {
-            t.UnauthorizedHandler.ServeHTTP(w, req)
-            return
-        }
-        context.Set(req, "token", token)
-        handlerFunc.ServeHTTP(w, req)
-    }
+// Verify : wrap a HandlerFunc to be authenticated
+func (t *TokenAuth) Verify(req *http.Request) bool {
+	token, err := t.Authenticate(req)
+	if err != nil {
+		return false
+	}
+	context.Set(req, "token", token)
+	return true
 }
 
-func (t *TokenAuth) Authenticate(req *http.Request) (Token, error) {
-    strToken := t.getter.GetTokenFromRequest(req)
-    // log.Println("read:", strToken)
-    if strToken == "" {
-        return nil, errors.New("token required")
-    }
-    token, err := t.store.CheckToken(strToken)
-    if err != nil {
-        return nil, errors.New("Invalid token")
-    }
-    return token, nil
+// Authenticate :
+func (t *TokenAuth) Authenticate(r *http.Request) (Token, error) {
+	strToken := t.getter.GetTokenFromRequest(r)
+	// log.Println("read:", strToken)
+	if strToken == "" {
+		return nil, errors.New("token required")
+	}
+	token, err := t.tokenStore.CheckToken(strToken)
+	if err != nil {
+		return nil, errors.New("Invalid token")
+	}
+	return token, nil
 }
 
-/* implement Handler */
-func (t *TokenAuth) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-    token, err := t.Authenticate(req)
-    if err != nil {
-        t.UnauthorizedHandler.ServeHTTP(w, req)
-        return
-    }
-    context.Set(req, "token", token)
-    t.handler.ServeHTTP(w, req)
-    context.Clear(req)
+// Authorize method
+func (t *TokenAuth) getUser(account string) (User, error) {
+	var u User
+	raw, err := t.store.Get("sa", "users/"+account)
+	if err != nil {
+		return u, err
+	}
+	var obj samo.Object
+	err = json.Unmarshal(raw, &obj)
+	if err != nil {
+		return u, err
+	}
+	err = json.Unmarshal([]byte(obj.Data), &u)
+	if err != nil {
+		return u, err
+	}
+	return u, nil
 }
 
-func Get(req *http.Request) Token {
-    return context.Get(req, "token").(Token)
+func getCredentials(r *http.Request) (Credentials, error) {
+	dec := json.NewDecoder(r.Body)
+	var c Credentials
+	err := dec.Decode(&c)
+	if err != nil {
+		return c, err
+	}
+
+	return c, nil
+}
+
+func (t *TokenAuth) checkCredentials(c Credentials) (User, error) {
+	u, err := t.getUser(c.Account)
+	if err != nil {
+		return u, errors.New("user not found")
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(c.Password))
+	if err != nil {
+		return u, errors.New("wrong password")
+	}
+
+	return u, nil
+}
+
+// Authorize will claim a token on POST and refresh the claim on PUT
+func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+	switch r.Method {
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Method not suported")
+	case "POST":
+		c, err := getCredentials(r)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, err.Error())
+			return
+		}
+		_, err = t.checkCredentials(c)
+		if err != nil {
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, err.Error())
+			return
+		}
+
+		newToken := t.tokenStore.NewToken("")
+		newToken.SetClaim("id", c.Account)
+		c.Password = ""
+		c.Token = newToken.String()
+		w.Header().Add("content-type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.Encode(&c)
+		return
+	case "PUT":
+		c, err := getCredentials(r)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, err.Error())
+			return
+		}
+		_, err = t.getUser(c.Account)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, err.Error())
+			return
+		}
+		if c.Token != "" {
+			_, err := t.tokenStore.CheckToken(c.Token)
+			if err == nil {
+				w.WriteHeader(http.StatusNotModified)
+				fmt.Fprint(w, errors.New("token not expired"))
+				return
+			}
+
+			if err.Error() != "Token expired" {
+				w.WriteHeader(http.StatusNotModified)
+				fmt.Fprint(w, err)
+				return
+			}
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, errors.New("empty token"))
+			return
+		}
+
+		newToken := t.tokenStore.NewToken("")
+		newToken.SetClaim("id", c.Account)
+		c.Token = newToken.String()
+		w.Header().Add("content-type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		enc := json.NewEncoder(w)
+		enc.Encode(&c)
+	}
+}
+
+// Register will create a new user
+func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
+	var u User
+	decoder := json.NewDecoder(r.Body)
+	defer r.Body.Close()
+	err := decoder.Decode(&u)
+
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", err)
+		return
+	}
+
+	// TODO: valid mail
+	// TODO: account valid characters
+	if u.Account == "" || u.Name == "" || u.Password == "" || u.Email == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("new user data incomplete"))
+		return
+	}
+
+	_, err = t.getUser(u.Account)
+
+	if err == nil {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("user account already exists"))
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.MinCost)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+
+	u.Password = string(hash)
+	u.Role = "user"
+	key, index, now := (&samo.Keys{}).Build("mo", "users", u.Account, "r", "/")
+	dataBytes := new(bytes.Buffer)
+	json.NewEncoder(dataBytes).Encode(u)
+	index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+
+	newToken := t.tokenStore.NewToken("")
+	newToken.SetClaim("id", u.Account)
+	c := Credentials{
+		Account: u.Account,
+		Token:   newToken.String(),
+	}
+	w.WriteHeader(http.StatusOK)
+	enc := json.NewEncoder(w)
+	enc.Encode(&c)
 }
