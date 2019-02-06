@@ -6,8 +6,7 @@ go:
   - 1.11.x
 
 install:
-  - go get github.com/gorilla/mux
-  - go get github.com/gorilla/context
+  - go get github.com/benitogf/samo
   - go get github.com/benitogf/jwt
 
 script:
