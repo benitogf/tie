@@ -40,7 +40,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	// unauthorized
 	req, err := http.NewRequest("GET", "/", nil)
 	if err != nil {
-		t.Errorf("Got error on restricted endpoint %s", err.Error())
+		t.Errorf("Request creation failed %s", err.Error())
 	}
 	w := httptest.NewRecorder()
 	server.Router.ServeHTTP(w, req)
