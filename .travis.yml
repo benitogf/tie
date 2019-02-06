@@ -8,7 +8,7 @@ go:
 install:
   - go get github.com/benitogf/samo
   - go get github.com/benitogf/jwt
-  - github.com/gorilla/context
+  - go get github.com/gorilla/context
 
 script:
   - go vet ./...
