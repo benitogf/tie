@@ -17,6 +17,7 @@ import (
 )
 
 func TestRegisterAndAuthorize(t *testing.T) {
+	var c auth.Credentials
 	dataStore := &samo.MemoryStorage{
 		Memdb:   make(map[string][]byte),
 		Storage: &samo.Storage{Active: false}}
@@ -25,7 +26,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 		log.Fatal(err)
 	}
 	tokenAuth := auth.NewTokenAuth(
-		auth.NewJwtStore("a-secret-key", time.Minute*10),
+		auth.NewJwtStore("a-secret-key", time.Second*1),
 		dataStore,
 	)
 	server := &samo.Server{}
@@ -70,6 +71,18 @@ func TestRegisterAndAuthorize(t *testing.T) {
 		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
 	}
 
+	dec := json.NewDecoder(response.Body)
+
+	err = dec.Decode(&c)
+	if err != nil {
+		t.Error("error decoding authorize response")
+	}
+	if c.Token == "" {
+		t.Errorf("Expected a token in the credentials response %s", c)
+	}
+
+	regToken := c.Token
+
 	// authorize
 	payload = []byte(`{"account":"admin","password":"000"}`)
 	req, err = http.NewRequest("POST", "/authorize", bytes.NewBuffer(payload))
@@ -84,9 +97,9 @@ func TestRegisterAndAuthorize(t *testing.T) {
 		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
 	}
 
-	dec := json.NewDecoder(response.Body)
-	var c auth.Credentials
-	if err := dec.Decode(&c); err != nil {
+	dec = json.NewDecoder(response.Body)
+	err = dec.Decode(&c)
+	if err != nil {
 		t.Error("error decoding authorize response")
 	}
 	if c.Token == "" {
@@ -94,7 +107,66 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	}
 
 	token := c.Token
-	// log.Println("generated token: ", token)
+	if token == regToken {
+		t.Errorf("Expected register and authorize to provide different tokens")
+	}
+
+	// wait expiration of the token
+	time.Sleep(time.Second * 2)
+
+	// expired
+	req, err = http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusUnauthorized, response.StatusCode)
+	}
+
+	// fake
+	fakeToken := "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1NDk1MzIxNjM5NDIxMDcxMDAsImlzcyI6ImFkbWluIn0.ZOPToC1AJs1hJRLoyFNZetsxvUNadYNtlIqWrm0FAKE"
+	req, err = http.NewRequest("GET", "/", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+fakeToken)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusUnauthorized {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusUnauthorized, response.StatusCode)
+	}
+
+	// refresh
+	payload = []byte(`{"account":"admin","token":"` + token + `"}`)
+	req, err = http.NewRequest("PUT", "/authorize", bytes.NewBuffer(payload))
+	if err != nil {
+		t.Errorf("Request creation failed %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+
+	dec = json.NewDecoder(response.Body)
+	err = dec.Decode(&c)
+	if err != nil {
+		t.Error("error decoding authorize refresh response")
+	}
+	if c.Token == "" {
+		t.Errorf("Expected a token in the refresh credentials response %s", c)
+	}
+
+	token = c.Token
 
 	// authorized
 	req, err = http.NewRequest("GET", "/", nil)

@@ -119,13 +119,12 @@ func (t *TokenAuth) Verify(req *http.Request) bool {
 // Authenticate :
 func (t *TokenAuth) Authenticate(r *http.Request) (Token, error) {
 	strToken := t.getter.GetTokenFromRequest(r)
-	// log.Println("read:", strToken)
 	if strToken == "" {
 		return nil, errors.New("token required")
 	}
 	token, err := t.tokenStore.CheckToken(strToken)
 	if err != nil {
-		return nil, errors.New("Invalid token")
+		return nil, err
 	}
 	return token, nil
 }
@@ -177,39 +176,26 @@ func (t *TokenAuth) checkCredentials(c Credentials) (User, error) {
 // Authorize will claim a token on POST and refresh the claim on PUT
 func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
+	c, err := getCredentials(r)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		return
+	}
 	switch r.Method {
 	default:
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "Method not suported")
+		return
 	case "POST":
-		c, err := getCredentials(r)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprint(w, err.Error())
-			return
-		}
 		_, err = t.checkCredentials(c)
 		if err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, err.Error())
 			return
 		}
-
-		newToken := t.tokenStore.NewToken("")
-		newToken.SetClaim("id", c.Account)
-		c.Password = ""
-		c.Token = newToken.String()
-		w.Header().Add("content-type", "application/json")
-		enc := json.NewEncoder(w)
-		enc.Encode(&c)
-		return
+		break
 	case "PUT":
-		c, err := getCredentials(r)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, err.Error())
-			return
-		}
 		_, err = t.getUser(c.Account)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -234,15 +220,16 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, errors.New("empty token"))
 			return
 		}
-
-		newToken := t.tokenStore.NewToken("")
-		newToken.SetClaim("id", c.Account)
-		c.Token = newToken.String()
-		w.Header().Add("content-type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		enc := json.NewEncoder(w)
-		enc.Encode(&c)
+		break
 	}
+
+	newToken := t.tokenStore.NewToken()
+	newToken.SetClaim("iss", c.Account)
+	c.Password = ""
+	c.Token = newToken.String()
+	w.Header().Add("content-type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(&c)
 }
 
 // Register will create a new user
@@ -283,9 +270,9 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 
 	u.Password = string(hash)
 	u.Role = "user"
-	key, index, now := (&samo.Keys{}).Build("mo", "users", u.Account, "r", "/")
 	dataBytes := new(bytes.Buffer)
 	json.NewEncoder(dataBytes).Encode(u)
+	key, index, now := (&samo.Keys{}).Build("mo", "users", u.Account, "r", "/")
 	index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
 
 	if err != nil {
@@ -294,8 +281,8 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newToken := t.tokenStore.NewToken("")
-	newToken.SetClaim("id", u.Account)
+	newToken := t.tokenStore.NewToken()
+	newToken.SetClaim("iss", u.Account)
 	c := Credentials{
 		Account: u.Account,
 		Token:   newToken.String(),

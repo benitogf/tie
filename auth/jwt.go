@@ -35,16 +35,7 @@ func (t *JwtToken) SetClaim(key string, value interface{}) ClaimSetter {
 // Expiry :
 func (t *JwtToken) Expiry() time.Time {
 	expt := t.Claims("exp")
-	var exp time.Time
-	switch t := expt.(type) {
-	case float64:
-		exp = time.Unix(int64(t), 0)
-	case int64:
-		exp = time.Unix(t, 0)
-	default:
-		exp = time.Now()
-	}
-	return exp
+	return time.Unix(0, int64(expt.(float64)))
 }
 
 // IsExpired :
@@ -60,10 +51,10 @@ func (t *JwtToken) String() string {
 }
 
 // NewToken :
-func (s *JwtStore) NewToken(id interface{}) *JwtToken {
+func (s *JwtStore) NewToken() *JwtToken {
 	token := jwt.New(jwt.GetSigningMethod("HS256"))
 	claims := token.Claims.(jwt.MapClaims)
-	claims["exp"] = time.Now().Add(s.expireAfter).Unix()
+	claims["exp"] = time.Now().Add(s.expireAfter).UnixNano()
 	t := &JwtToken{
 		tokenKey: s.tokenKey,
 		Token:    *token,
