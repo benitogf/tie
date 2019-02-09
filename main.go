@@ -19,7 +19,7 @@ func main() {
 		Path:    *path,
 		Storage: &samo.Storage{Active: false},
 	}
-	err := dataStore.Start("/")
+	err := dataStore.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
