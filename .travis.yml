@@ -8,8 +8,8 @@ go:
 install:
   - go get github.com/benitogf/samo
   - go get github.com/benitogf/jwt
-  - go get github.com/gorilla/context
   - go get golang.org/x/crypto/bcrypt
+  - go get github.com/prometheus/client_golang/prometheus
 
 script:
   - go vet ./...

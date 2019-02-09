@@ -6,12 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/benitogf/samo"
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/gorilla/context"
 )
 
 // User :
@@ -66,6 +65,11 @@ type BearerGetter struct {
 	Header string
 }
 
+var (
+	userRegexp  = regexp.MustCompile("^[a-z\\d]+$")
+	emailRegexp = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+)
+
 // DefaultUnauthorizedHandler :
 func DefaultUnauthorizedHandler(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusUnauthorized)
@@ -108,11 +112,11 @@ func NewTokenAuth(tokenStore *JwtStore, store samo.Database) *TokenAuth {
 
 // Verify : wrap a HandlerFunc to be authenticated
 func (t *TokenAuth) Verify(req *http.Request) bool {
-	token, err := t.Authenticate(req)
+	_, err := t.Authenticate(req)
 	if err != nil {
 		return false
 	}
-	context.Set(req, "token", token)
+	// context.Set(req, "token", token)
 	return true
 }
 
@@ -245,11 +249,27 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: valid mail
-	// TODO: account valid characters
 	if u.Account == "" || u.Name == "" || u.Password == "" || u.Email == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("new user data incomplete"))
+		return
+	}
+
+	if !userRegexp.MatchString(u.Account) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("account name cannot contain special characters, only numbers or lowercase letters"))
+		return
+	}
+
+	if len(u.Account) < 2 {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("account name must contain at least 2 characters"))
+		return
+	}
+
+	if !emailRegexp.MatchString(u.Email) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("invalid email address"))
 		return
 	}
 
