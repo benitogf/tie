@@ -18,8 +18,7 @@ import (
 
 func TestRegisterAndAuthorize(t *testing.T) {
 	var c auth.Credentials
-	dataStore := &samo.MemoryStorage{
-		Storage: &samo.Storage{Active: false}}
+	dataStore := &samo.MemoryStorage{}
 	err := dataStore.Start()
 	if err != nil {
 		log.Fatal(err)

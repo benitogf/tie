@@ -27,9 +27,7 @@ func main() {
 	prometheus.MustRegister(subscribed)
 	// create users storage
 	dataStore := &samo.LevelDbStorage{
-		Path:    *authPath,
-		Storage: &samo.Storage{Active: false},
-	}
+		Path: *authPath}
 	err := dataStore.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -45,9 +43,7 @@ func main() {
 	server := &samo.Server{}
 	server.Silence = false
 	server.Storage = &samo.LevelDbStorage{
-		Path:    *dataPath,
-		Storage: &samo.Storage{Active: false},
-	}
+		Path: *dataPath}
 	server.Audit = tokenAuth.Verify
 	server.Subscribe = func(mode string, key string, remoteAddr string) error {
 		subscribed.Add(1)
