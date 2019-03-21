@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	server.Audit = tokenAuth.Verify
 	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
+	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Start("localhost:9060")
 	defer server.Close(os.Interrupt)
@@ -181,7 +183,33 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	}
 
 	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
 	if string(body) != "{\"keys\":[]}" {
 		t.Errorf("Expected an empty array. Got %s", string(body))
 	}
+
+	// profile
+	req, err = http.NewRequest("GET", "/profile", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `{"name":"Admin","email":"admin@admin.test","phone":"123123123","account":"admin","password":"","role":"user"}` {
+		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
+
 }

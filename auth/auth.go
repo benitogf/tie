@@ -177,6 +177,34 @@ func (t *TokenAuth) checkCredentials(c Credentials) (User, error) {
 	return u, nil
 }
 
+// Profile returns to the client the correspondent user profile for the token provided
+func (t *TokenAuth) Profile(w http.ResponseWriter, r *http.Request) {
+	token, err := t.Authenticate(r)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintf(w, "%s", errors.New("this request is not authorized"))
+		return
+	}
+	switch r.Method {
+	case "GET":
+		u, err := t.getUser(token.Claims("iss").(string))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprintf(w, "bad token, couldnt find the issuer profile")
+			return
+		}
+		u.Password = ""
+		w.WriteHeader(http.StatusOK)
+		enc := json.NewEncoder(w)
+		enc.Encode(&u)
+		return
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Method not suported")
+		return
+	}
+}
+
 // Authorize will claim a token on POST and refresh the claim on PUT
 func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
@@ -187,10 +215,6 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.Method {
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "Method not suported")
-		return
 	case "POST":
 		_, err = t.checkCredentials(c)
 		if err != nil {
@@ -225,6 +249,10 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		break
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Method not suported")
+		return
 	}
 
 	newToken := t.tokenStore.NewToken()

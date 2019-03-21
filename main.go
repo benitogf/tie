@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"log"
+	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/benitogf/samo"
@@ -44,7 +46,13 @@ func main() {
 	server.Silence = false
 	server.Storage = &samo.LevelDbStorage{
 		Path: *dataPath}
-	server.Audit = tokenAuth.Verify
+	server.Audit = func(r *http.Request) bool {
+		key := mux.Vars(r)["key"]
+		if strings.Split(key, "/")[0] == "boxes" {
+			return true
+		}
+		return tokenAuth.Verify(r)
+	}
 	server.Subscribe = func(mode string, key string, remoteAddr string) error {
 		subscribed.Add(1)
 		return nil
@@ -54,6 +62,7 @@ func main() {
 	}
 	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
+	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Router.Handle("/metrics", promhttp.Handler())
 	server.Start("localhost:" + strconv.Itoa(*port))
