@@ -43,16 +43,32 @@ func main() {
 
 	// Server
 	server := &samo.Server{}
-	server.Silence = false
+	server.Silence = false // logs silence
+	server.Static = true   // only allow filtered paths
+
+	// Server - Storage
 	server.Storage = &samo.LevelDbStorage{
 		Path: *dataPath}
+
+	// Server - Audits
 	server.Audit = func(r *http.Request) bool {
 		key := mux.Vars(r)["key"]
-		if strings.Split(key, "/")[0] == "boxes" {
+		authorized := tokenAuth.Verify(r)
+		if authorized {
 			return true
 		}
+
+		if strings.Split(key, "/")[0] == "boxes" && r.Method == "GET" {
+			return true
+		}
+
+		return false
+	}
+	server.AuditEvent = func(r *http.Request, event samo.Message) bool {
 		return tokenAuth.Verify(r)
 	}
+
+	// Server - Monitoring
 	server.Subscribe = func(mode string, key string, remoteAddr string) error {
 		subscribed.Add(1)
 		return nil
@@ -60,6 +76,30 @@ func main() {
 	server.Unsubscribe = func(mode string, key string, remoteAddr string) {
 		subscribed.Sub(1)
 	}
+
+	// Server - Filters
+	server.ReceiveFilter("boxes", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+	server.SendFilter("boxes", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+
+	server.ReceiveFilter("boxes/*/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+	server.SendFilter("boxes/*/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+
+	server.ReceiveFilter("boxes/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+	server.SendFilter("boxes/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+
+	// Server - Routes
 	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
