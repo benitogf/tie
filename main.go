@@ -52,6 +52,10 @@ func main() {
 
 	// Server - Audits
 	server.Audit = func(r *http.Request) bool {
+		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
+		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
+			r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
+		}
 		key := mux.Vars(r)["key"]
 		authorized := tokenAuth.Verify(r)
 		if authorized {
