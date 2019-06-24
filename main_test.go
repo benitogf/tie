@@ -143,6 +143,20 @@ func TestRegisterAndAuthorize(t *testing.T) {
 		t.Errorf("Expected response code %d. Got %d\n", http.StatusUnauthorized, response.StatusCode)
 	}
 
+	// refresh user doesn't match token
+	payload = []byte(`{"account":"notadmin","token":"` + token + `"}`)
+	req, err = http.NewRequest("PUT", "/authorize", bytes.NewBuffer(payload))
+	if err != nil {
+		t.Errorf("Request creation failed %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusBadRequest {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusBadRequest, response.StatusCode)
+	}
+
 	// refresh
 	payload = []byte(`{"account":"admin","token":"` + token + `"}`)
 	req, err = http.NewRequest("PUT", "/authorize", bytes.NewBuffer(payload))
