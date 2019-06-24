@@ -46,33 +46,75 @@ func main() {
 	server.Silence = false // logs silence
 	server.Static = true   // only allow filtered paths
 
-	// Server - Storage
+	// Storage
 	server.Storage = &samo.LevelDbStorage{
 		Path: *dataPath}
 
-	// Server - Audits
+	// Audits
 	server.Audit = func(r *http.Request) bool {
+		key := mux.Vars(r)["key"]
+
+		// public endpoints
+		if strings.Split(key, "/")[0] == "boxes" && r.Method == "GET" {
+			return true
+		}
+
+		if strings.Split(key, "/")[0] == "mails" && r.Method == "POST" {
+			return true
+		}
+
+		// get the header from a websocket connection
 		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
 		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
 			r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
 		}
-		key := mux.Vars(r)["key"]
-		authorized := tokenAuth.Verify(r)
+
+		token, err := tokenAuth.Authenticate(r)
+		authorized := (err == nil)
+		user := ""
 		if authorized {
+			user = token.Claims("iss").(string)
+		}
+
+		// admin authorization
+		if authorized && user == "admin" {
 			return true
 		}
 
-		if strings.Split(key, "/")[0] == "boxes" && r.Method == "GET" {
+		if authorized && r.URL.Path == "/time" {
 			return true
 		}
 
 		return false
 	}
 	server.AuditEvent = func(r *http.Request, event samo.Message) bool {
+		key := mux.Vars(r)["key"]
+		// get the header from a websocket connection
+		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
+		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
+			r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
+		}
+
+		token, err := tokenAuth.Authenticate(r)
+		authorized := (err == nil)
+		user := ""
+		if authorized {
+			user = token.Claims("iss").(string)
+		}
+
+		// admin authorization
+		if authorized && user == "admin" {
+			return true
+		}
+
+		if strings.Split(key, "/")[0] == "boxes" && user != "admin" {
+			return false
+		}
+
 		return tokenAuth.Verify(r)
 	}
 
-	// Server - Monitoring
+	// Monitoring
 	server.Subscribe = func(mode string, key string, remoteAddr string) error {
 		subscribed.Add(1)
 		return nil
@@ -81,7 +123,7 @@ func main() {
 		subscribed.Sub(1)
 	}
 
-	// Server - Filters
+	// Filters
 	server.ReceiveFilter("boxes", func(index string, data []byte) ([]byte, error) {
 		return data, nil
 	})
@@ -100,6 +142,13 @@ func main() {
 		return data, nil
 	})
 	server.SendFilter("boxes/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+
+	server.ReceiveFilter("mails", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+	server.SendFilter("mails", func(index string, data []byte) ([]byte, error) {
 		return data, nil
 	})
 

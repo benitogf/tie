@@ -72,7 +72,7 @@ func (s *JwtStore) CheckToken(token string) (Token, error) {
 	}
 	jtoken := &JwtToken{s.tokenKey, *t}
 	if jtoken.IsExpired() {
-		return nil, errors.New("Token expired")
+		return jtoken, errors.New("Token expired")
 	}
 	return jtoken, nil
 }

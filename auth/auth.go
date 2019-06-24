@@ -231,10 +231,16 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if c.Token != "" {
-			_, err := t.tokenStore.CheckToken(c.Token)
+			oldToken, err := t.tokenStore.CheckToken(c.Token)
 			if err == nil {
 				w.WriteHeader(http.StatusNotModified)
 				fmt.Fprint(w, errors.New("token not expired"))
+				return
+			}
+
+			if oldToken.Claims("iss").(string) != c.Account {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprint(w, errors.New("token doesn't match the account"))
 				return
 			}
 
