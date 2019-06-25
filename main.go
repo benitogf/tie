@@ -111,7 +111,7 @@ func main() {
 			return false
 		}
 
-		return tokenAuth.Verify(r)
+		return false
 	}
 
 	// Monitoring
@@ -149,6 +149,13 @@ func main() {
 		return data, nil
 	})
 	server.SendFilter("mails", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+
+	server.ReceiveFilter("mails/*", func(index string, data []byte) ([]byte, error) {
+		return data, nil
+	})
+	server.SendFilter("mails/*", func(index string, data []byte) ([]byte, error) {
 		return data, nil
 	})
 
