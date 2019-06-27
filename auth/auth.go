@@ -66,8 +66,9 @@ type BearerGetter struct {
 }
 
 var (
-	userRegexp  = regexp.MustCompile("^[a-z\\d]+$")
+	userRegexp  = regexp.MustCompile("^[a-zA-Z0-9_]{2,15}$")
 	emailRegexp = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+	phoneRegexp = regexp.MustCompile("^[0-9_-]{6,15}$")
 )
 
 // DefaultUnauthorizedHandler :
@@ -283,7 +284,7 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if u.Account == "" || u.Name == "" || u.Password == "" || u.Email == "" {
+	if u.Account == "" || u.Name == "" || u.Password == "" || u.Email == "" || u.Phone == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("new user data incomplete"))
 		return
@@ -291,13 +292,19 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 
 	if !userRegexp.MatchString(u.Account) {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "%s", errors.New("account name cannot contain special characters, only numbers or lowercase letters"))
+		fmt.Fprintf(w, "%s", errors.New("account cannot contain special characters, only numbers or lowercase letters and character count must be between 2 and 15"))
 		return
 	}
 
-	if len(u.Account) < 2 {
+	if len(u.Password) < 3 || len(u.Password) > 88 {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "%s", errors.New("account name must contain at least 2 characters"))
+		fmt.Fprintf(w, "%s", errors.New("password character count must be between 2 and 88"))
+		return
+	}
+
+	if !userRegexp.MatchString(u.Phone) {
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "%s", errors.New("phone cannot contain special characters othen than '-' and character count must be between 6 and 15"))
 		return
 	}
 
@@ -311,7 +318,7 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "%s", errors.New("user account already exists"))
+		fmt.Fprintf(w, "%s", errors.New("account name taken"))
 		return
 	}
 
@@ -344,4 +351,18 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	enc.Encode(&c)
+}
+
+// Available will check if an account is taken
+func (t *TokenAuth) Available(w http.ResponseWriter, r *http.Request) {
+	account := r.FormValue("account")
+	_, err := t.getUser(account)
+
+	if err == nil {
+		w.WriteHeader(http.StatusConflict)
+		fmt.Fprintf(w, "account taken")
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "account available")
 }

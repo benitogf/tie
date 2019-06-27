@@ -164,6 +164,7 @@ func main() {
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
+	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
 	server.Router.Handle("/metrics", promhttp.Handler())
 	server.Start("localhost:" + strconv.Itoa(*port))
 	server.WaitClose()

@@ -35,6 +35,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
+	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
 	server.Start("localhost:9060")
 	defer server.Close(os.Interrupt)
 
@@ -113,6 +114,32 @@ func TestRegisterAndAuthorize(t *testing.T) {
 
 	// wait expiration of the token
 	time.Sleep(time.Second * 2)
+
+	// taken
+	req, err = http.NewRequest("GET", "/available?account=admin", nil)
+	if err != nil {
+		t.Errorf("Got error on available endpoint %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusConflict {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusConflict, response.StatusCode)
+	}
+
+	//available
+	req, err = http.NewRequest("GET", "/available?account=notadmin", nil)
+	if err != nil {
+		t.Errorf("Got error on available endpoint %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
 
 	// expired
 	req, err = http.NewRequest("GET", "/", nil)
