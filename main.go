@@ -114,7 +114,7 @@ func main() {
 		}
 
 		// admin authorization
-		if authorized && role == "admin" {
+		if authorized && (role == "admin" || role == "root") {
 			return true
 		}
 
@@ -155,6 +155,8 @@ func main() {
 	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
+	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")
+	server.Router.HandleFunc("/user/{account:[a-zA-Z\\d]+}", tokenAuth.User).Methods("GET", "POST")
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
 	server.Router.Handle("/metrics", promhttp.Handler())
