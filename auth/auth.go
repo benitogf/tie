@@ -28,6 +28,7 @@ type Credentials struct {
 	Account  string `json:"account"`
 	Password string `json:"password"`
 	Token    string `json:"token"`
+	Role     string `json:"role"`
 }
 
 // TokenAuth :
@@ -69,6 +70,7 @@ var (
 	userRegexp  = regexp.MustCompile("^[a-zA-Z0-9_]{2,15}$")
 	emailRegexp = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	phoneRegexp = regexp.MustCompile("^[0-9_-]{6,15}$")
+	roles       = map[string]string{"admin": "admin"}
 )
 
 // DefaultUnauthorizedHandler :
@@ -195,6 +197,10 @@ func (t *TokenAuth) Profile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		u.Password = ""
+		role, otherRole := roles[u.Account]
+		if otherRole {
+			u.Role = role
+		}
 		w.WriteHeader(http.StatusOK)
 		enc := json.NewEncoder(w)
 		enc.Encode(&u)
@@ -265,6 +271,12 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 	newToken := t.tokenStore.NewToken()
 	newToken.SetClaim("iss", c.Account)
 	c.Password = ""
+	c.Role = "user"
+	role, otherRole := roles[c.Account]
+	if otherRole {
+		c.Role = role
+	}
+	newToken.SetClaim("role", c.Role)
 	c.Token = newToken.String()
 	w.Header().Add("content-type", "application/json")
 	enc := json.NewEncoder(w)
@@ -331,6 +343,10 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 
 	u.Password = string(hash)
 	u.Role = "user"
+	role, otherRole := roles[u.Account]
+	if otherRole {
+		u.Role = role
+	}
 	dataBytes := new(bytes.Buffer)
 	json.NewEncoder(dataBytes).Encode(u)
 	key, index, now := (&samo.Keys{}).Build("mo", "users", u.Account, "r", "/")
@@ -344,6 +360,7 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 
 	newToken := t.tokenStore.NewToken()
 	newToken.SetClaim("iss", u.Account)
+	newToken.SetClaim("role", u.Role)
 	c := Credentials{
 		Account: u.Account,
 		Token:   newToken.String(),

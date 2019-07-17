@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -24,6 +25,38 @@ var subscribed = prometheus.NewGauge(prometheus.GaugeOpts{
 	Name: "active_subscriptions",
 	Help: "active subscriptions",
 })
+
+func openFilter(index string, data []byte) ([]byte, error) {
+	return data, nil
+}
+
+func closedFilter(index string, data []byte) ([]byte, error) {
+	return data, errors.New("out of bounds route")
+}
+
+func addListDetailFilter(server *samo.Server, name string) {
+	server.ReceiveFilter(name, openFilter)
+	server.SendFilter(name, openFilter)
+	server.ReceiveFilter(name+"/*", openFilter)
+	server.SendFilter(name+"/*", openFilter)
+	server.ReceiveFilter(name+"/*/*", closedFilter)
+	server.SendFilter(name+"/*/*", closedFilter)
+}
+
+func addRelatedListDetailFilter(server *samo.Server, name string) {
+	server.ReceiveFilter(name, closedFilter)
+	server.SendFilter(name, closedFilter)
+	server.ReceiveFilter(name+"/*", openFilter)
+	server.SendFilter(name+"/*", openFilter)
+	server.ReceiveFilter(name+"/*/*", openFilter)
+	server.SendFilter(name+"/*/*", openFilter)
+	server.ReceiveFilter(name+"/*/*/*", closedFilter)
+	server.SendFilter(name+"/*/*/*", closedFilter)
+}
+
+func getRootPath(url string) string {
+	return strings.Split(url, "/")[0]
+}
 
 func main() {
 	prometheus.MustRegister(subscribed)
@@ -55,11 +88,15 @@ func main() {
 		key := mux.Vars(r)["key"]
 
 		// public endpoints
-		if strings.Split(key, "/")[0] == "boxes" && r.Method == "GET" {
+		if getRootPath(key) == "boxes" && r.Method == "GET" {
 			return true
 		}
 
-		if strings.Split(key, "/")[0] == "mails" && r.Method == "POST" {
+		if getRootPath(key) == "things" && r.Method == "GET" {
+			return true
+		}
+
+		if getRootPath(key) == "mails" && r.Method == "POST" {
 			return true
 		}
 
@@ -71,13 +108,13 @@ func main() {
 
 		token, err := tokenAuth.Authenticate(r)
 		authorized := (err == nil)
-		user := ""
+		role := "user"
 		if authorized {
-			user = token.Claims("iss").(string)
+			role = token.Claims("role").(string)
 		}
 
 		// admin authorization
-		if authorized && user == "admin" {
+		if authorized && role == "admin" {
 			return true
 		}
 
@@ -88,28 +125,14 @@ func main() {
 		return false
 	}
 	server.AuditEvent = func(r *http.Request, event samo.Message) bool {
-		key := mux.Vars(r)["key"]
+		// The header will not update after the connection is stablished,
+		// so the token might expire and remain the same during the connection lifetime
+		// key := mux.Vars(r)["key"]
 		// get the header from a websocket connection
 		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
-		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
-			r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
-		}
-
-		token, err := tokenAuth.Authenticate(r)
-		authorized := (err == nil)
-		user := ""
-		if authorized {
-			user = token.Claims("iss").(string)
-		}
-
-		// admin authorization
-		if authorized && user == "admin" {
-			return true
-		}
-
-		if strings.Split(key, "/")[0] == "boxes" && user != "admin" {
-			return false
-		}
+		// if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
+		// 	r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
+		// }
 
 		return false
 	}
@@ -124,40 +147,9 @@ func main() {
 	}
 
 	// Filters
-	server.ReceiveFilter("boxes", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-	server.SendFilter("boxes", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-
-	server.ReceiveFilter("boxes/*/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-	server.SendFilter("boxes/*/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-
-	server.ReceiveFilter("boxes/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-	server.SendFilter("boxes/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-
-	server.ReceiveFilter("mails", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-	server.SendFilter("mails", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-
-	server.ReceiveFilter("mails/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
-	server.SendFilter("mails/*", func(index string, data []byte) ([]byte, error) {
-		return data, nil
-	})
+	addListDetailFilter(server, "boxes")
+	addRelatedListDetailFilter(server, "things")
+	addListDetailFilter(server, "mails")
 
 	// Server - Routes
 	server.Router = mux.NewRouter()

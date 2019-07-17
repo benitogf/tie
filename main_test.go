@@ -54,11 +54,11 @@ func TestRegisterAndAuthorize(t *testing.T) {
 
 	// register
 	payload := []byte(`{
-        "name": "Admin",
+        "name": "admin",
         "account":"admin",
         "password": "000",
         "email": "admin@admin.test",
-        "phone": "123123123"
+				"phone": "123123123"
     }`)
 	req, err = http.NewRequest("POST", "/register", bytes.NewBuffer(payload))
 	if err != nil {
@@ -249,7 +249,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"Admin","email":"admin@admin.test","phone":"123123123","account":"admin","password":"","role":"user"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"admin","email":"admin@admin.test","phone":"123123123","account":"admin","password":"","role":"admin"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
