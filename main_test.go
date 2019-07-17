@@ -34,6 +34,8 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
+	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")
+	server.Router.HandleFunc("/user/{account:[a-zA-Z\\d]+}", tokenAuth.User).Methods("GET", "POST")
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
 	server.Start("localhost:9060")
@@ -54,10 +56,10 @@ func TestRegisterAndAuthorize(t *testing.T) {
 
 	// register
 	payload := []byte(`{
-        "name": "admin",
-        "account":"admin",
+        "name": "root",
+        "account":"root",
         "password": "000",
-        "email": "admin@admin.test",
+        "email": "root@root.test",
 				"phone": "123123123"
     }`)
 	req, err = http.NewRequest("POST", "/register", bytes.NewBuffer(payload))
@@ -85,7 +87,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	regToken := c.Token
 
 	// authorize
-	payload = []byte(`{"account":"admin","password":"000"}`)
+	payload = []byte(`{"account":"root","password":"000"}`)
 	req, err = http.NewRequest("POST", "/authorize", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Errorf("Request creation failed %s", err.Error())
@@ -116,7 +118,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	// taken
-	req, err = http.NewRequest("GET", "/available?account=admin", nil)
+	req, err = http.NewRequest("GET", "/available?account=root", nil)
 	if err != nil {
 		t.Errorf("Got error on available endpoint %s", err.Error())
 	}
@@ -185,7 +187,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	}
 
 	// refresh
-	payload = []byte(`{"account":"admin","token":"` + token + `"}`)
+	payload = []byte(`{"account":"root","token":"` + token + `"}`)
 	req, err = http.NewRequest("PUT", "/authorize", bytes.NewBuffer(payload))
 	if err != nil {
 		t.Errorf("Request creation failed %s", err.Error())
@@ -249,8 +251,92 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"admin","email":"admin@admin.test","phone":"123123123","account":"admin","password":"","role":"admin"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
+	// users
+	req, err = http.NewRequest("GET", "/users", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `[{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}]` {
+		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
+
+	// get user
+	req, err = http.NewRequest("GET", "/user/root", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}` {
+		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
+
+	// update user
+	payload = []byte(`{"phone":"321321321"}`)
+	req, err = http.NewRequest("POST", "/user/root", bytes.NewBuffer(payload))
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","password":"","role":"root"}` {
+		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
+
+	// get updated user
+	req, err = http.NewRequest("GET", "/user/root", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
+	}
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","password":"","role":"root"}` {
+		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
 }

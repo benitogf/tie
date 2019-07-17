@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/benitogf/samo"
+	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -70,7 +71,7 @@ var (
 	userRegexp  = regexp.MustCompile("^[a-zA-Z0-9_]{2,15}$")
 	emailRegexp = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	phoneRegexp = regexp.MustCompile("^[0-9_-]{6,15}$")
-	roles       = map[string]string{"admin": "admin"}
+	roles       = map[string]string{"root": "root", "admin": "admin"}
 )
 
 // DefaultUnauthorizedHandler :
@@ -138,46 +139,68 @@ func (t *TokenAuth) Authenticate(r *http.Request) (Token, error) {
 
 // Authorize method
 func (t *TokenAuth) getUser(account string) (User, error) {
-	var u User
+	var user User
 	raw, err := t.store.Get("sa", "users/"+account)
 	if err != nil {
-		return u, err
+		return user, err
 	}
 	var obj samo.Object
 	err = json.Unmarshal(raw, &obj)
 	if err != nil {
-		return u, err
+		return user, err
 	}
-	err = json.Unmarshal([]byte(obj.Data), &u)
+	err = json.Unmarshal([]byte(obj.Data), &user)
 	if err != nil {
-		return u, err
+		return user, err
 	}
-	return u, nil
+	return user, nil
+}
+
+func (t *TokenAuth) getUsers() ([]User, error) {
+	var users []User
+	raw, err := t.store.Get("mo", "users")
+	if err != nil {
+		return nil, err
+	}
+	var objects []samo.Object
+	err = json.Unmarshal(raw, &objects)
+	if err != nil {
+		return nil, err
+	}
+	for _, object := range objects {
+		var user User
+		err = json.Unmarshal([]byte(object.Data), &user)
+		if err == nil {
+			user.Password = ""
+			users = append(users, user)
+		}
+	}
+	return users, nil
 }
 
 func getCredentials(r *http.Request) (Credentials, error) {
 	dec := json.NewDecoder(r.Body)
-	var c Credentials
-	err := dec.Decode(&c)
+	var credentials Credentials
+	err := dec.Decode(&credentials)
 	if err != nil {
-		return c, err
+		return credentials, err
 	}
 
-	return c, nil
+	return credentials, nil
 }
 
-func (t *TokenAuth) checkCredentials(c Credentials) (User, error) {
-	u, err := t.getUser(c.Account)
+func (t *TokenAuth) checkCredentials(credentials Credentials) (User, error) {
+	user, err := t.getUser(credentials.Account)
 	if err != nil {
-		return u, errors.New("user not found")
+		return user, errors.New("user not found")
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(c.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
 	if err != nil {
-		return u, errors.New("wrong password")
+		return user, errors.New("wrong password")
 	}
 
-	return u, nil
+	return user, nil
 }
 
 // Profile returns to the client the correspondent user profile for the token provided
@@ -190,20 +213,16 @@ func (t *TokenAuth) Profile(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case "GET":
-		u, err := t.getUser(token.Claims("iss").(string))
+		user, err := t.getUser(token.Claims("iss").(string))
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, "bad token, couldnt find the issuer profile")
 			return
 		}
-		u.Password = ""
-		role, otherRole := roles[u.Account]
-		if otherRole {
-			u.Role = role
-		}
+		user.Password = ""
 		w.WriteHeader(http.StatusOK)
 		enc := json.NewEncoder(w)
-		enc.Encode(&u)
+		enc.Encode(&user)
 		return
 	default:
 		w.WriteHeader(http.StatusBadRequest)
@@ -215,15 +234,21 @@ func (t *TokenAuth) Profile(w http.ResponseWriter, r *http.Request) {
 // Authorize will claim a token on POST and refresh the claim on PUT
 func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
-	c, err := getCredentials(r)
+	credentials, err := getCredentials(r)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	user, err := t.getUser(credentials.Account)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprint(w, err.Error())
 		return
 	}
 	switch r.Method {
 	case "POST":
-		_, err = t.checkCredentials(c)
+		_, err = t.checkCredentials(credentials)
 		if err != nil {
 			w.WriteHeader(http.StatusForbidden)
 			fmt.Fprint(w, err.Error())
@@ -231,21 +256,15 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 		}
 		break
 	case "PUT":
-		_, err = t.getUser(c.Account)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprint(w, err.Error())
-			return
-		}
-		if c.Token != "" {
-			oldToken, err := t.tokenStore.CheckToken(c.Token)
+		if credentials.Token != "" {
+			oldToken, err := t.tokenStore.CheckToken(credentials.Token)
 			if err == nil {
 				w.WriteHeader(http.StatusNotModified)
 				fmt.Fprint(w, errors.New("token not expired"))
 				return
 			}
 
-			if oldToken.Claims("iss").(string) != c.Account {
+			if oldToken.Claims("iss").(string) != credentials.Account {
 				w.WriteHeader(http.StatusBadRequest)
 				fmt.Fprint(w, errors.New("token doesn't match the account"))
 				return
@@ -269,26 +288,22 @@ func (t *TokenAuth) Authorize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newToken := t.tokenStore.NewToken()
-	newToken.SetClaim("iss", c.Account)
-	c.Password = ""
-	c.Role = "user"
-	role, otherRole := roles[c.Account]
-	if otherRole {
-		c.Role = role
-	}
-	newToken.SetClaim("role", c.Role)
-	c.Token = newToken.String()
+	newToken.SetClaim("iss", credentials.Account)
+	newToken.SetClaim("role", user.Role)
+	credentials.Password = ""
+	credentials.Role = user.Role
+	credentials.Token = newToken.String()
 	w.Header().Add("content-type", "application/json")
 	enc := json.NewEncoder(w)
-	enc.Encode(&c)
+	enc.Encode(&credentials)
 }
 
 // Register will create a new user
 func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
-	var u User
+	var user User
 	decoder := json.NewDecoder(r.Body)
 	defer r.Body.Close()
-	err := decoder.Decode(&u)
+	err := decoder.Decode(&user)
 
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -296,37 +311,37 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if u.Account == "" || u.Name == "" || u.Password == "" || u.Email == "" || u.Phone == "" {
+	if user.Account == "" || user.Name == "" || user.Password == "" || user.Email == "" || user.Phone == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("new user data incomplete"))
 		return
 	}
 
-	if !userRegexp.MatchString(u.Account) {
+	if !userRegexp.MatchString(user.Account) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("account cannot contain special characters, only numbers or lowercase letters and character count must be between 2 and 15"))
 		return
 	}
 
-	if len(u.Password) < 3 || len(u.Password) > 88 {
+	if len(user.Password) < 3 || len(user.Password) > 88 {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("password character count must be between 2 and 88"))
 		return
 	}
 
-	if !userRegexp.MatchString(u.Phone) {
+	if !userRegexp.MatchString(user.Phone) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("phone cannot contain special characters othen than '-' and character count must be between 6 and 15"))
 		return
 	}
 
-	if !emailRegexp.MatchString(u.Email) {
+	if !emailRegexp.MatchString(user.Email) {
 		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, "%s", errors.New("invalid email address"))
 		return
 	}
 
-	_, err = t.getUser(u.Account)
+	_, err = t.getUser(user.Account)
 
 	if err == nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -334,22 +349,22 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.MinCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.MinCost)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprint(w, err.Error())
 		return
 	}
 
-	u.Password = string(hash)
-	u.Role = "user"
-	role, otherRole := roles[u.Account]
+	user.Password = string(hash)
+	user.Role = "user"
+	role, otherRole := roles[user.Account]
 	if otherRole {
-		u.Role = role
+		user.Role = role
 	}
 	dataBytes := new(bytes.Buffer)
-	json.NewEncoder(dataBytes).Encode(u)
-	key, index, now := (&samo.Keys{}).Build("mo", "users", u.Account, "r", "/")
+	json.NewEncoder(dataBytes).Encode(user)
+	key, index, now := (&samo.Keys{}).Build("mo", "users", user.Account, "r", "/")
 	index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
 
 	if err != nil {
@@ -359,15 +374,16 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	newToken := t.tokenStore.NewToken()
-	newToken.SetClaim("iss", u.Account)
-	newToken.SetClaim("role", u.Role)
-	c := Credentials{
-		Account: u.Account,
+	newToken.SetClaim("iss", user.Account)
+	newToken.SetClaim("role", user.Role)
+	credentials := Credentials{
+		Account: user.Account,
 		Token:   newToken.String(),
+		Role:    user.Role,
 	}
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
-	enc.Encode(&c)
+	enc.Encode(&credentials)
 }
 
 // Available will check if an account is taken
@@ -382,4 +398,105 @@ func (t *TokenAuth) Available(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "account available")
+}
+
+// Users will send the user list to a root user
+func (t *TokenAuth) Users(w http.ResponseWriter, r *http.Request) {
+	token, err := t.Authenticate(r)
+	authorized := (err == nil)
+	role := "user"
+	if authorized {
+		role = token.Claims("role").(string)
+	}
+
+	// root authorization
+	if authorized && role != "root" {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, "Method not suported for your role")
+		return
+	}
+
+	users, err := t.getUsers()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	enc := json.NewEncoder(w)
+	enc.Encode(&users)
+}
+
+// User will send the user list to a root user
+func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
+	token, err := t.Authenticate(r)
+	authorized := (err == nil)
+	role := "user"
+	if authorized {
+		role = token.Claims("role").(string)
+	}
+
+	// root authorization
+	if authorized && role != "root" {
+		w.WriteHeader(http.StatusForbidden)
+		fmt.Fprintf(w, "Method not suported for your role")
+		return
+	}
+	account := mux.Vars(r)["account"]
+
+	user, err := t.getUser(account)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, err.Error())
+		return
+	}
+	user.Password = ""
+	switch r.Method {
+	case "GET":
+		w.Header().Set("Content-Type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.Encode(&user)
+		break
+	case "POST":
+		defer r.Body.Close()
+		dec := json.NewDecoder(r.Body)
+		var userData User
+		err := dec.Decode(&userData)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, errors.New("Invalid user data"))
+			return
+		}
+		if userData.Email != "" {
+			user.Email = userData.Email
+		}
+		if userData.Name != "" {
+			user.Name = userData.Name
+		}
+		if userData.Phone != "" {
+			user.Phone = userData.Phone
+		}
+		if userData.Role != "" {
+			user.Role = userData.Role
+		}
+		dataBytes := new(bytes.Buffer)
+		json.NewEncoder(dataBytes).Encode(user)
+		key, index, now := (&samo.Keys{}).Build("sa", "users/"+user.Account, "", "r", "/")
+		index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Header().Set("Content-Type", "application/json")
+		enc := json.NewEncoder(w)
+		enc.Encode(&user)
+		break
+	default:
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, "Method not suported")
+		return
+	}
 }
