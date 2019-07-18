@@ -71,7 +71,7 @@ var (
 	userRegexp  = regexp.MustCompile("^[a-zA-Z0-9_]{2,15}$")
 	emailRegexp = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
 	phoneRegexp = regexp.MustCompile("^[0-9_-]{6,15}$")
-	roles       = map[string]string{"root": "root", "admin": "admin"}
+	roles       = map[string]string{"root": "root"}
 )
 
 // DefaultUnauthorizedHandler :
