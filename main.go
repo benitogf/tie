@@ -50,12 +50,10 @@ func addRelatedListDetailFilter(server *samo.Server, name string) {
 	server.SendFilter(name+"/*", openFilter)
 	server.ReceiveFilter(name+"/*/*", openFilter)
 	server.SendFilter(name+"/*/*", openFilter)
-	server.ReceiveFilter(name+"/*/*/*", closedFilter)
-	server.SendFilter(name+"/*/*/*", closedFilter)
-}
-
-func getRootPath(url string) string {
-	return strings.Split(url, "/")[0]
+	server.ReceiveFilter(name+"/*/*/*", openFilter)
+	server.SendFilter(name+"/*/*/*", openFilter)
+	server.ReceiveFilter(name+"/*/*/*/*", closedFilter)
+	server.SendFilter(name+"/*/*/*/*", closedFilter)
 }
 
 func main() {
@@ -87,17 +85,19 @@ func main() {
 	// Audits
 	server.Audit = func(r *http.Request) bool {
 		key := mux.Vars(r)["key"]
-
+		path := strings.Split(key, "/")
 		// public endpoints
-		if getRootPath(key) == "boxes" && r.Method == "GET" {
+		// read only
+		if path[0] == "boxes" && r.Method == "GET" {
 			return true
 		}
 
-		if getRootPath(key) == "things" && r.Method == "GET" {
+		if path[0] == "things" && r.Method == "GET" {
 			return true
 		}
 
-		if getRootPath(key) == "mails" && r.Method == "POST" {
+		// write only
+		if path[0] == "mails" && r.Method == "POST" {
 			return true
 		}
 
@@ -110,12 +110,19 @@ func main() {
 		token, err := tokenAuth.Authenticate(r)
 		authorized := (err == nil)
 		role := "user"
+		account := ""
 		if authorized {
 			role = token.Claims("role").(string)
+			account = token.Claims("iss").(string)
 		}
 
-		// admin authorization
+		// root and admin authorization
 		if authorized && (role == "admin" || role == "root") {
+			return true
+		}
+
+		// user related things
+		if authorized && path[0] == "things" && len(path) >= 2 && path[2] == account {
 			return true
 		}
 
