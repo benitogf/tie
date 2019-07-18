@@ -458,6 +458,16 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 		enc := json.NewEncoder(w)
 		enc.Encode(&user)
 		break
+	case "DELETE":
+		err := t.store.Del("users/" + user.Account)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprintf(w, "%s", err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		fmt.Fprintf(w, "deleted "+account)
+		break
 	case "POST":
 		defer r.Body.Close()
 		dec := json.NewDecoder(r.Body)

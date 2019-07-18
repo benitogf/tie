@@ -35,7 +35,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")
-	server.Router.HandleFunc("/user/{account:[a-zA-Z\\d]+}", tokenAuth.User).Methods("GET", "POST")
+	server.Router.HandleFunc("/user/{account:[a-zA-Z\\d]+}", tokenAuth.User).Methods("GET", "POST", "DELETE")
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
 	server.Start("localhost:9060")
@@ -338,5 +338,39 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	}
 	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","password":"","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
+	}
+
+	// delete user
+	req, err = http.NewRequest("DELETE", "/user/root", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusNoContent {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusNoContent, response.StatusCode)
+	}
+	body, err = ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Errorf("Got error reading response.  %s", err.Error())
+	}
+	if strings.TrimRight(string(body), "\n") != `deleted root` {
+		t.Errorf("Expected deleted message. Got %s", string(body))
+	}
+
+	// available deleted user
+	req, err = http.NewRequest("GET", "/available?account=root", nil)
+	if err != nil {
+		t.Errorf("Got error on available endpoint %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusOK {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusOK, response.StatusCode)
 	}
 }
