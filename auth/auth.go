@@ -451,9 +451,9 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, err.Error())
 		return
 	}
-	user.Password = ""
 	switch r.Method {
 	case "GET":
+		user.Password = ""
 		w.Header().Set("Content-Type", "application/json")
 		enc := json.NewEncoder(w)
 		enc.Encode(&user)
@@ -489,6 +489,7 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 			fmt.Fprint(w, err)
 			return
 		}
+		user.Password = ""
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 		enc := json.NewEncoder(w)
