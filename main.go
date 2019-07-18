@@ -59,6 +59,7 @@ func getRootPath(url string) string {
 }
 
 func main() {
+	flag.Parse()
 	prometheus.MustRegister(subscribed)
 	// create users storage
 	dataStore := &samo.LevelDbStorage{
