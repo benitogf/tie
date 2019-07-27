@@ -20,14 +20,14 @@ type User struct {
 	Email    string `json:"email"`
 	Phone    string `json:"phone"`
 	Account  string `json:"account"`
-	Password string `json:"password"`
+	Password string `json:"password,omitempty"`
 	Role     string `json:"role"`
 }
 
 // Credentials :
 type Credentials struct {
 	Account  string `json:"account"`
-	Password string `json:"password"`
+	Password string `json:"password,omitempty"`
 	Token    string `json:"token"`
 	Role     string `json:"role"`
 }

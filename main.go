@@ -60,7 +60,7 @@ func main() {
 	flag.Parse()
 	prometheus.MustRegister(subscribed)
 	// create users storage
-	dataStore := &samo.LevelDbStorage{
+	dataStore := &samo.LevelStorage{
 		Path: *authPath}
 	err := dataStore.Start()
 	if err != nil {
@@ -79,7 +79,7 @@ func main() {
 	server.Static = true   // only allow filtered paths
 
 	// Storage
-	server.Storage = &samo.LevelDbStorage{
+	server.Storage = &samo.LevelStorage{
 		Path: *dataPath}
 
 	// Audits
@@ -129,18 +129,6 @@ func main() {
 		if authorized && r.URL.Path == "/time" {
 			return true
 		}
-
-		return false
-	}
-	server.AuditEvent = func(r *http.Request, event samo.Message) bool {
-		// The header will not update after the connection is stablished,
-		// so the token might expire and remain the same during the connection lifetime
-		// key := mux.Vars(r)["key"]
-		// get the header from a websocket connection
-		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
-		// if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
-		// 	r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
-		// }
 
 		return false
 	}
