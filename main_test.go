@@ -251,7 +251,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
@@ -272,7 +272,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `[{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}]` {
+	if strings.TrimRight(string(body), "\n") != `[{"name":"root","email":"root@root.test","phone":"123123123","account":"root","role":"root"}]` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
@@ -293,7 +293,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","password":"","role":"root"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"123123123","account":"root","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
@@ -315,7 +315,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","password":"","role":"root"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
@@ -336,7 +336,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error reading response.  %s", err.Error())
 	}
-	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","password":"","role":"root"}` {
+	if strings.TrimRight(string(body), "\n") != `{"name":"root","email":"root@root.test","phone":"321321321","account":"root","role":"root"}` {
 		t.Errorf("Expected the user profile. Got %s", string(body))
 	}
 
