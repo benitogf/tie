@@ -96,6 +96,10 @@ func main() {
 			return true
 		}
 
+		if path[0] == "posts" && r.Method == "GET" {
+			return true
+		}
+
 		// write only
 		if path[0] == "mails" && r.Method == "POST" {
 			return true
@@ -146,6 +150,7 @@ func main() {
 	addListDetailFilter(server, "boxes")
 	addRelatedListDetailFilter(server, "things")
 	addListDetailFilter(server, "mails")
+	addListDetailFilter(server, "posts")
 
 	// Server - Routes
 	server.Router = mux.NewRouter()
