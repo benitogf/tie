@@ -364,8 +364,7 @@ func (t *TokenAuth) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	dataBytes := new(bytes.Buffer)
 	json.NewEncoder(dataBytes).Encode(user)
-	key, index, now := (&samo.Keys{}).Build("mo", "users", user.Account, "r", "/")
-	index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
+	_, err = t.store.Set("users/"+user.Account, string(dataBytes.Bytes()))
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -492,8 +491,7 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 		}
 		dataBytes := new(bytes.Buffer)
 		json.NewEncoder(dataBytes).Encode(user)
-		key, index, now := (&samo.Keys{}).Build("sa", "users/"+user.Account, "", "r", "/")
-		index, err = t.store.Set(key, index, now, string(dataBytes.Bytes()))
+		_, err = t.store.Set("users/"+user.Account, string(dataBytes.Bytes()))
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprint(w, err)
