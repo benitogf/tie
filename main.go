@@ -17,8 +17,8 @@ import (
 )
 
 var key = flag.String("key", "a-secret-key", "secret key for tokens")
-var authPath = flag.String("authPath", "db/auth", "user storage path")
-var dataPath = flag.String("dataPath", "db/data", "user storage path")
+var authPath = flag.String("authPath", "db/auth", "auth storage path")
+var dataPath = flag.String("dataPath", "db/data", "data storage path")
 var port = flag.Int("port", 8800, "service port")
 
 var subscribed = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -58,7 +58,10 @@ func addRelatedListDetailFilter(server *samo.Server, name string) {
 
 func main() {
 	flag.Parse()
+
+	// prometheus
 	prometheus.MustRegister(subscribed)
+
 	// create users storage
 	dataStore := &samo.LevelStorage{
 		Path: *authPath}
