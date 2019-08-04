@@ -120,7 +120,7 @@ func main() {
 			return true
 		}
 
-		if authorized && r.URL.Path == "" {
+		if authorized && r.URL.Path == "/" {
 			return true
 		}
 
