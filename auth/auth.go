@@ -140,7 +140,7 @@ func (t *TokenAuth) Authenticate(r *http.Request) (Token, error) {
 // Authorize method
 func (t *TokenAuth) getUser(account string) (User, error) {
 	var user User
-	raw, err := t.store.Get("sa", "users/"+account)
+	raw, err := t.store.Get("users/" + account)
 	if err != nil {
 		return user, err
 	}
@@ -158,7 +158,7 @@ func (t *TokenAuth) getUser(account string) (User, error) {
 
 func (t *TokenAuth) getUsers() ([]User, error) {
 	var users []User
-	raw, err := t.store.Get("mo", "users")
+	raw, err := t.store.Get("users/*")
 	if err != nil {
 		return nil, err
 	}
@@ -468,7 +468,6 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "deleted "+account)
 		break
 	case "POST":
-		defer r.Body.Close()
 		dec := json.NewDecoder(r.Body)
 		var userData User
 		err := dec.Decode(&userData)
