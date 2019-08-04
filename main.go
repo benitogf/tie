@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"log"
 	"net/http"
@@ -30,30 +29,9 @@ func openFilter(index string, data []byte) ([]byte, error) {
 	return data, nil
 }
 
-func closedFilter(index string, data []byte) ([]byte, error) {
-	return data, errors.New("out of bounds route")
-}
-
-func addListDetailFilter(server *samo.Server, name string) {
-	server.ReceiveFilter(name, openFilter)
-	server.SendFilter(name, openFilter)
-	server.ReceiveFilter(name+"/*", openFilter)
-	server.SendFilter(name+"/*", openFilter)
-	server.ReceiveFilter(name+"/*/*", closedFilter)
-	server.SendFilter(name+"/*/*", closedFilter)
-}
-
-func addRelatedListDetailFilter(server *samo.Server, name string) {
-	server.ReceiveFilter(name, closedFilter)
-	server.SendFilter(name, closedFilter)
-	server.ReceiveFilter(name+"/*", openFilter)
-	server.SendFilter(name+"/*", openFilter)
-	server.ReceiveFilter(name+"/*/*", openFilter)
-	server.SendFilter(name+"/*/*", openFilter)
-	server.ReceiveFilter(name+"/*/*/*", openFilter)
-	server.SendFilter(name+"/*/*/*", openFilter)
-	server.ReceiveFilter(name+"/*/*/*/*", closedFilter)
-	server.SendFilter(name+"/*/*/*/*", closedFilter)
+func addOpenFilter(server *samo.Server, name string) {
+	server.WriteFilter(name, openFilter)
+	server.ReadFilter(name, openFilter)
 }
 
 func main() {
@@ -78,9 +56,18 @@ func main() {
 
 	// Server
 	server := &samo.Server{}
+	server.Defaults()
 	server.Silence = false // logs silence
 	server.Static = true   // only allow filtered paths
-
+	go func() {
+		for {
+			_ = <-dataStore.Watch()
+			// go app.sendData(ev.key)
+			if !dataStore.Active() {
+				break
+			}
+		}
+	}()
 	// Storage
 	server.Storage = &samo.LevelStorage{
 		Path: *dataPath}
@@ -133,7 +120,7 @@ func main() {
 			return true
 		}
 
-		if authorized && r.URL.Path == "/time" {
+		if authorized && r.URL.Path == "" {
 			return true
 		}
 
@@ -141,22 +128,21 @@ func main() {
 	}
 
 	// Monitoring
-	server.Subscribe = func(mode string, key string, remoteAddr string) error {
+	server.Subscribe = func(key string) error {
 		subscribed.Add(1)
 		return nil
 	}
-	server.Unsubscribe = func(mode string, key string, remoteAddr string) {
+	server.Unsubscribe = func(key string) {
 		subscribed.Sub(1)
 	}
 
 	// Filters
-	addListDetailFilter(server, "boxes")
-	addRelatedListDetailFilter(server, "things")
-	addListDetailFilter(server, "mails")
-	addListDetailFilter(server, "posts")
+	addOpenFilter(server, "boxes/*")
+	addOpenFilter(server, "things/*/*/*") // thing/boxid/userid/id
+	addOpenFilter(server, "mails/*")
+	addOpenFilter(server, "posts/*")
 
 	// Server - Routes
-	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")
