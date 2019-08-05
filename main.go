@@ -56,7 +56,6 @@ func main() {
 
 	// Server
 	server := &samo.Server{}
-	server.Defaults()
 	server.Silence = false // logs silence
 	server.Static = true   // only allow filtered paths
 	go func() {
@@ -143,6 +142,7 @@ func main() {
 	addOpenFilter(server, "posts/*")
 
 	// Server - Routes
+	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")

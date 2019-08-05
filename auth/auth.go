@@ -409,7 +409,7 @@ func (t *TokenAuth) Users(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// root authorization
-	if authorized && role != "root" {
+	if !authorized || role != "root" {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprintf(w, "Method not suported for your role")
 		return
@@ -437,7 +437,7 @@ func (t *TokenAuth) User(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// root authorization
-	if authorized && role != "root" {
+	if !authorized || role != "root" {
 		w.WriteHeader(http.StatusForbidden)
 		fmt.Fprintf(w, "Method not suported for your role")
 		return
