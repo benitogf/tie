@@ -259,6 +259,18 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	if err != nil {
 		t.Errorf("Got error on restricted endpoint %s", err.Error())
 	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusForbidden {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusForbidden, response.StatusCode)
+	}
+
+	req, err = http.NewRequest("GET", "/users", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	w = httptest.NewRecorder()
 	server.Router.ServeHTTP(w, req)
@@ -276,6 +288,18 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	}
 
 	// get user
+	req, err = http.NewRequest("GET", "/user/root", nil)
+	if err != nil {
+		t.Errorf("Got error on restricted endpoint %s", err.Error())
+	}
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+
+	if response.StatusCode != http.StatusForbidden {
+		t.Errorf("Expected response code %d. Got %d\n", http.StatusForbidden, response.StatusCode)
+	}
+
 	req, err = http.NewRequest("GET", "/user/root", nil)
 	if err != nil {
 		t.Errorf("Got error on restricted endpoint %s", err.Error())
