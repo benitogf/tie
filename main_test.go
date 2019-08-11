@@ -14,6 +14,7 @@ import (
 
 	"github.com/benitogf/samo"
 	"github.com/benitogf/tie/auth"
+	"github.com/gorilla/mux"
 )
 
 func TestRegisterAndAuthorize(t *testing.T) {
@@ -30,7 +31,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 	server := &samo.Server{}
 	server.Silence = true
 	server.Audit = tokenAuth.Verify
-	server.Defaults()
+	server.Router = mux.NewRouter()
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")

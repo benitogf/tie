@@ -94,6 +94,10 @@ func main() {
 			return true
 		}
 
+		if path[0] == "stocks" && r.Method == "GET" {
+			return true
+		}
+
 		// get the header from a websocket connection
 		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
 		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
@@ -140,6 +144,7 @@ func main() {
 	addOpenFilter(server, "things/*/*/*") // thing/boxid/userid/id
 	addOpenFilter(server, "mails/*")
 	addOpenFilter(server, "posts/*")
+	addOpenFilter(server, "stocks/*/*")
 
 	// Server - Routes
 	server.Router = mux.NewRouter()
