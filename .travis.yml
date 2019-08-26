@@ -3,10 +3,11 @@ os:
   - linux
 
 go:
-  - 1.11.x
+  - 1.12.x
 
 install:
-  - go get github.com/benitogf/samo
+  - go get github.com/benitogf/katamari
+  - go get github.com/benitogf/katamari/level
   - go get github.com/benitogf/jwt
   - go get golang.org/x/crypto/bcrypt
   - go get github.com/prometheus/client_golang/prometheus
