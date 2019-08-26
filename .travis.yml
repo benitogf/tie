@@ -7,6 +7,7 @@ go:
 
 install:
   - go get github.com/benitogf/katamari
+  - go get github.com/benitogf/katamari/level
   - go get github.com/benitogf/jwt
   - go get golang.org/x/crypto/bcrypt
   - go get github.com/prometheus/client_golang/prometheus
