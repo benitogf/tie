@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/benitogf/katamari"
 	"github.com/benitogf/samo"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
@@ -35,7 +36,7 @@ type Credentials struct {
 // TokenAuth :
 type TokenAuth struct {
 	tokenStore          *JwtStore
-	store               samo.Database
+	store               katamari.Database
 	getter              TokenGetter
 	UnauthorizedHandler http.HandlerFunc
 }
@@ -104,7 +105,7 @@ func NewHeaderBearerTokenGetter(header string) *BearerGetter {
 // if a unauthorizedHandler is provided, unauthorized requests will be handled by this HandlerFunc,
 // otherwise a default unauthorized handler is used.
 // store is the TokenStore that stores and verify the tokens
-func NewTokenAuth(tokenStore *JwtStore, store samo.Database) *TokenAuth {
+func NewTokenAuth(tokenStore *JwtStore, store katamari.Database) *TokenAuth {
 	t := &TokenAuth{
 		tokenStore: tokenStore,
 		store:      store,
@@ -144,7 +145,7 @@ func (t *TokenAuth) getUser(account string) (User, error) {
 	if err != nil {
 		return user, err
 	}
-	var obj samo.Object
+	var obj katamari.Object
 	err = json.Unmarshal(raw, &obj)
 	if err != nil {
 		return user, err

@@ -12,15 +12,23 @@ import (
 	"testing"
 	"time"
 
-	"github.com/benitogf/samo"
+	"github.com/benitogf/katamari"
 	"github.com/benitogf/tie/auth"
 	"github.com/gorilla/mux"
 )
 
 func TestRegisterAndAuthorize(t *testing.T) {
 	var c auth.Credentials
-	dataStore := &samo.MemoryStorage{}
+	dataStore := &katamari.MemoryStorage{}
 	err := dataStore.Start()
+	go func() {
+		for {
+			_ = <-dataStore.Watch()
+			if !dataStore.Active() {
+				break
+			}
+		}
+	}()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,7 +36,7 @@ func TestRegisterAndAuthorize(t *testing.T) {
 		auth.NewJwtStore("a-secret-key", time.Second*1),
 		dataStore,
 	)
-	server := &samo.Server{}
+	server := &katamari.Server{}
 	server.Silence = true
 	server.Audit = tokenAuth.Verify
 	server.Router = mux.NewRouter()

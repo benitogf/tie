@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/benitogf/samo"
+	"github.com/benitogf/katamari"
+	"github.com/benitogf/katamari/level"
 	"github.com/benitogf/tie/auth"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,7 +30,7 @@ func openFilter(index string, data []byte) ([]byte, error) {
 	return data, nil
 }
 
-func addOpenFilter(server *samo.Server, name string) {
+func addOpenFilter(server *katamari.Server, name string) {
 	server.WriteFilter(name, openFilter)
 	server.ReadFilter(name, openFilter)
 }
@@ -41,7 +42,7 @@ func main() {
 	prometheus.MustRegister(subscribed)
 
 	// create users storage
-	dataStore := &samo.LevelStorage{
+	dataStore := &level.Storage{
 		Path: *authPath}
 	err := dataStore.Start()
 	if err != nil {
@@ -55,20 +56,19 @@ func main() {
 	)
 
 	// Server
-	server := &samo.Server{}
+	server := &katamari.Server{}
 	server.Silence = false // logs silence
 	server.Static = true   // only allow filtered paths
 	go func() {
 		for {
 			_ = <-dataStore.Watch()
-			// go app.sendData(ev.key)
 			if !dataStore.Active() {
 				break
 			}
 		}
 	}()
 	// Storage
-	server.Storage = &samo.LevelStorage{
+	server.Storage = &level.Storage{
 		Path: *dataPath}
 
 	// Audits
@@ -135,11 +135,11 @@ func main() {
 	}
 
 	// Monitoring
-	server.Subscribe = func(key string) error {
+	server.OnSubscribe = func(key string) error {
 		subscribed.Add(1)
 		return nil
 	}
-	server.Unsubscribe = func(key string) {
+	server.OnUnsubscribe = func(key string) {
 		subscribed.Sub(1)
 	}
 
