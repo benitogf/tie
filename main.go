@@ -107,26 +107,10 @@ func auditRequest(r *http.Request, tokenAuth *auth.TokenAuth) bool {
 	return false
 }
 
-func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request) {
-	key := "posts/*"
-	client, poolIndex, err := server.Stream.New(key, w, r)
+func blogFilter(index string, data []byte) ([]byte, error) {
+	unfiltered, err := objects.DecodeList(data)
 	if err != nil {
-		return
-	}
-
-	cache, err := server.Stream.GetPoolCache(key)
-	if err != nil {
-		raw, _ := server.Storage.Get(key)
-		newVersion := server.Stream.SetCache(poolIndex, raw)
-		cache = stream.Cache{
-			Version: newVersion,
-			Data:    raw,
-		}
-	}
-
-	unfiltered, err := objects.DecodeList(cache.Data)
-	if err != nil {
-		return
+		return []byte(""), err
 	}
 	filtered := []objects.Object{}
 	for _, obj := range unfiltered {
@@ -142,11 +126,35 @@ func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request)
 	}
 	rawFiltered, err := objects.Encode(filtered)
 	if err != nil {
+		return []byte(""), err
+	}
+	return rawFiltered, nil
+}
+
+func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request) {
+	key := "posts/*"
+	client, poolIndex, err := server.Stream.New(key, "blog", w, r)
+	if err != nil {
+		return
+	}
+
+	cache, err := server.Stream.GetPoolCache(key)
+	if err != nil {
+		raw, _ := server.Storage.Get(key)
+		newVersion := server.Stream.SetCache(poolIndex, raw)
+		cache = stream.Cache{
+			Version: newVersion,
+			Data:    raw,
+		}
+	}
+
+	rawFiltered, err := blogFilter("blog", cache.Data)
+	if err != nil {
 		return
 	}
 
 	go server.Stream.Write(client, messages.Encode(rawFiltered), true, cache.Version)
-	server.Stream.Read(key, client)
+	server.Stream.Read(key, "blog", client)
 }
 
 func watchStorage(dataStore *level.Storage) {
@@ -205,6 +213,7 @@ func main() {
 	addOpenFilter(server, "things/*/*/*") // thing/boxid/userid/id
 	addOpenFilter(server, "mails/*")
 	addOpenFilter(server, "posts/*")
+	server.ReadFilter("blog", blogFilter)
 	addOpenFilter(server, "stocks/*/*")
 	addOpenFilter(server, "market/*")
 
