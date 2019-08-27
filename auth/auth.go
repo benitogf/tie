@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/benitogf/katamari"
+	"github.com/benitogf/katamari/objects"
 	"github.com/gorilla/mux"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -144,7 +145,7 @@ func (t *TokenAuth) getUser(account string) (User, error) {
 	if err != nil {
 		return user, err
 	}
-	var obj katamari.Object
+	var obj objects.Object
 	err = json.Unmarshal(raw, &obj)
 	if err != nil {
 		return user, err
@@ -162,7 +163,7 @@ func (t *TokenAuth) getUsers() ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
-	var objects []katamari.Object
+	var objects []objects.Object
 	err = json.Unmarshal(raw, &objects)
 	if err != nil {
 		return nil, err
