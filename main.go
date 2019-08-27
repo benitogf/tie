@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -8,13 +10,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/benitogf/katamari/objects"
+
 	"github.com/benitogf/katamari"
-	"github.com/benitogf/katamari/level"
+	"github.com/benitogf/katamari/messages"
+	"github.com/benitogf/katamari/storages/level"
+	"github.com/benitogf/katamari/stream"
 	"github.com/benitogf/tie/auth"
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+type post struct {
+	Active bool `json:"active"`
+}
 
 var key = flag.String("key", "a-secret-key", "secret key for tokens")
 var authPath = flag.String("authPath", "db/auth", "auth storage path")
@@ -35,6 +45,127 @@ func addOpenFilter(server *katamari.Server, name string) {
 	server.ReadFilter(name, openFilter)
 }
 
+func auditRequest(r *http.Request, tokenAuth *auth.TokenAuth) bool {
+	key := mux.Vars(r)["key"]
+	path := strings.Split(key, "/")
+	// public endpoints
+	// read only
+	if path[0] == "boxes" && r.Method == "GET" {
+		return true
+	}
+
+	if path[0] == "things" && r.Method == "GET" {
+		return true
+	}
+
+	if path[0] == "posts" && r.Method == "GET" {
+		return true
+	}
+
+	// write only
+	if path[0] == "mails" && r.Method == "POST" {
+		return true
+	}
+
+	if path[0] == "stocks" && r.Method == "GET" {
+		return true
+	}
+
+	if path[0] == "market" && r.Method == "GET" {
+		return true
+	}
+
+	// get the header from a websocket connection
+	// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
+	if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
+		r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
+	}
+
+	token, err := tokenAuth.Authenticate(r)
+	authorized := (err == nil)
+	role := "user"
+	account := ""
+	if authorized {
+		role = token.Claims("role").(string)
+		account = token.Claims("iss").(string)
+	}
+
+	// root and admin authorization
+	if authorized && (role == "admin" || role == "root") {
+		return true
+	}
+
+	// user related things
+	if authorized && path[0] == "things" && len(path) >= 2 && path[2] == account {
+		return true
+	}
+
+	if authorized && r.URL.Path == "/" {
+		return true
+	}
+
+	return false
+}
+
+func blogFilter(index string, data []byte) ([]byte, error) {
+	unfiltered, err := objects.DecodeList(data)
+	if err != nil {
+		return []byte(""), err
+	}
+	filtered := []objects.Object{}
+	for _, obj := range unfiltered {
+		decoded, err := base64.StdEncoding.DecodeString(obj.Data)
+		if err != nil {
+			continue
+		}
+		var postData post
+		err = json.Unmarshal(decoded, &postData)
+		if err == nil && postData.Active {
+			filtered = append(filtered, obj)
+		}
+	}
+	rawFiltered, err := objects.Encode(filtered)
+	if err != nil {
+		return []byte(""), err
+	}
+	return rawFiltered, nil
+}
+
+func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request) {
+	key := "posts/*"
+	client, poolIndex, err := server.Stream.New(key, "blog", w, r)
+	if err != nil {
+		return
+	}
+
+	cache, err := server.Stream.GetPoolCache(key)
+	if err != nil {
+		raw, _ := server.Storage.Get(key)
+		newVersion := server.Stream.SetCache(poolIndex, raw)
+		cache = stream.Cache{
+			Version: newVersion,
+			Data:    raw,
+		}
+	}
+
+	rawFiltered, err := blogFilter("blog", cache.Data)
+	if err != nil {
+		return
+	}
+
+	go server.Stream.Write(client, messages.Encode(rawFiltered), true, cache.Version)
+	server.Stream.Read(key, "blog", client)
+}
+
+func watchStorage(dataStore *level.Storage) {
+	for {
+		_ = <-dataStore.Watch()
+		if !dataStore.Active() {
+			break
+		}
+	}
+}
+
 func main() {
 	flag.Parse()
 
@@ -42,9 +173,8 @@ func main() {
 	prometheus.MustRegister(subscribed)
 
 	// create users storage
-	dataStore := &level.Storage{
-		Path: *authPath}
-	err := dataStore.Start()
+	authStore := &level.Storage{Path: *authPath}
+	err := authStore.Start()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,86 +182,21 @@ func main() {
 	// create a tokenAuth
 	tokenAuth := auth.NewTokenAuth(
 		auth.NewJwtStore(*key, time.Minute*10),
-		dataStore,
+		authStore,
 	)
 
 	// Server
 	server := &katamari.Server{}
 	server.Silence = false // logs silence
 	server.Static = true   // only allow filtered paths
-	go func() {
-		for {
-			_ = <-dataStore.Watch()
-			if !dataStore.Active() {
-				break
-			}
-		}
-	}()
+	go watchStorage(authStore)
+
 	// Storage
-	server.Storage = &level.Storage{
-		Path: *dataPath}
+	server.Storage = &level.Storage{Path: *dataPath}
 
-	// Audits
+	// Audit
 	server.Audit = func(r *http.Request) bool {
-		key := mux.Vars(r)["key"]
-		path := strings.Split(key, "/")
-		// public endpoints
-		// read only
-		if path[0] == "boxes" && r.Method == "GET" {
-			return true
-		}
-
-		if path[0] == "things" && r.Method == "GET" {
-			return true
-		}
-
-		if path[0] == "posts" && r.Method == "GET" {
-			return true
-		}
-
-		// write only
-		if path[0] == "mails" && r.Method == "POST" {
-			return true
-		}
-
-		if path[0] == "stocks" && r.Method == "GET" {
-			return true
-		}
-
-		if path[0] == "market" && r.Method == "GET" {
-			return true
-		}
-
-		// get the header from a websocket connection
-		// https://stackoverflow.com/questions/22383089/is-it-possible-to-use-bearer-authentication-for-websocket-upgrade-requests
-		if r.Header.Get("Upgrade") == "websocket" && r.Header.Get("Sec-WebSocket-Protocol") != "" {
-			r.Header.Add("Authorization", "Bearer "+strings.Replace(r.Header.Get("Sec-WebSocket-Protocol"), "bearer, ", "", 1))
-		}
-
-		token, err := tokenAuth.Authenticate(r)
-		authorized := (err == nil)
-		role := "user"
-		account := ""
-		if authorized {
-			role = token.Claims("role").(string)
-			account = token.Claims("iss").(string)
-		}
-
-		// root and admin authorization
-		if authorized && (role == "admin" || role == "root") {
-			return true
-		}
-
-		// user related things
-		if authorized && path[0] == "things" && len(path) >= 2 && path[2] == account {
-			return true
-		}
-
-		if authorized && r.URL.Path == "/" {
-			return true
-		}
-
-		return false
+		return auditRequest(r, tokenAuth)
 	}
 
 	// Monitoring
@@ -148,6 +213,7 @@ func main() {
 	addOpenFilter(server, "things/*/*/*") // thing/boxid/userid/id
 	addOpenFilter(server, "mails/*")
 	addOpenFilter(server, "posts/*")
+	server.ReadFilter("blog", blogFilter)
 	addOpenFilter(server, "stocks/*/*")
 	addOpenFilter(server, "market/*")
 
@@ -156,6 +222,9 @@ func main() {
 	server.Router.HandleFunc("/authorize", tokenAuth.Authorize)
 	server.Router.HandleFunc("/profile", tokenAuth.Profile)
 	server.Router.HandleFunc("/users", tokenAuth.Users).Methods("GET")
+	server.Router.HandleFunc("/blog", func(w http.ResponseWriter, r *http.Request) {
+		blogStream(server, w, r)
+	}).Methods("GET")
 	server.Router.HandleFunc("/user/{account:[a-zA-Z\\d]+}", tokenAuth.User).Methods("GET", "POST", "DELETE")
 	server.Router.HandleFunc("/register", tokenAuth.Register).Methods("POST")
 	server.Router.HandleFunc("/available", tokenAuth.Available).Queries("account", "{[a-zA-Z\\d]}").Methods("GET")
