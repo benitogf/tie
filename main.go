@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/benitogf/tie/router"
 	"github.com/benitogf/katamari"
-	"github.com/benitogf/katamari/storages/level"
 	"github.com/benitogf/katamari/auth"
+	"github.com/benitogf/katamari/storages/level"
+	"github.com/benitogf/tie/router"
+	"github.com/gorilla/mux"
 )
 
 var key = flag.String("key", "a-secret-key", "secret key for tokens")
@@ -41,6 +42,7 @@ func main() {
 	server.Audit = func(r *http.Request) bool {
 		return router.Audit(r, auth)
 	}
+	server.Router = mux.NewRouter()
 	router.Routes(server)
 	auth.Router(server)
 	server.Start("localhost:" + strconv.Itoa(*port))
