@@ -1,9 +1,9 @@
 package router
 
 import (
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/benitogf/katamari"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func monitor(server *katamari.Server) {

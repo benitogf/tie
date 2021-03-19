@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/benitogf/katamari/auth"
+	"github.com/benitogf/auth"
 	"github.com/gorilla/mux"
 )
 

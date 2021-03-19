@@ -12,8 +12,8 @@ import (
 	"github.com/benitogf/katamari/messages"
 	"github.com/gorilla/websocket"
 
+	"github.com/benitogf/auth"
 	"github.com/benitogf/katamari"
-	"github.com/benitogf/katamari/auth"
 	"github.com/benitogf/tie/router"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func TestBlog(t *testing.T) {
 	var wsEvent messages.Message
 	var mutex sync.Mutex
 	authStore := &katamari.MemoryStorage{}
-	err := authStore.Start()
+	err := authStore.Start(katamari.StorageOpt{})
 	require.NoError(t, err)
 	go katamari.WatchStorageNoop(authStore)
 	auth := auth.New(

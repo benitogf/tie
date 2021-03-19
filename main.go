@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/benitogf/auth"
 	"github.com/benitogf/katamari"
-	"github.com/benitogf/katamari/auth"
-	"github.com/benitogf/katamari/storages/level"
+	"github.com/benitogf/level"
 	"github.com/benitogf/tie/router"
 	"github.com/gorilla/mux"
 )
@@ -24,7 +24,7 @@ func main() {
 
 	// auth
 	authStore := &level.Storage{Path: *authPath}
-	err := authStore.Start()
+	err := authStore.Start(katamari.StorageOpt{})
 	if err != nil {
 		log.Fatal(err)
 	}
