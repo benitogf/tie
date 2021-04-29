@@ -42,6 +42,9 @@ func main() {
 	server.Audit = func(r *http.Request) bool {
 		return router.Audit(r, auth)
 	}
+	server.OnClose = func() {
+		authStore.Close()
+	}
 	server.Router = mux.NewRouter()
 	router.Routes(server)
 	auth.Router(server)
