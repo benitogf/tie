@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+
 	"github.com/benitogf/katamari"
 )
 
@@ -12,7 +13,7 @@ func Routes(server *katamari.Server) {
 	server.OpenFilter("things/*/*/*") // thing/boxid/userid/id
 	server.OpenFilter("mails/*")
 	server.OpenFilter("posts/*")
-	server.ReadFilter("blog", blogFilter)
+	server.ReadFilter("posts/*", blogFilter)
 	server.OpenFilter("stocks/*/*")
 	server.OpenFilter("market/*")
 
