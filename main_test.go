@@ -50,6 +50,13 @@ func TestBlog(t *testing.T) {
 	response := w.Result()
 	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
 
+	req, err = http.NewRequest("DELETE", "/posts/*", nil)
+	require.NoError(t, err)
+	w = httptest.NewRecorder()
+	server.Router.ServeHTTP(w, req)
+	response = w.Result()
+	require.Equal(t, http.StatusUnauthorized, response.StatusCode)
+
 	wsURL := url.URL{Scheme: "ws", Host: "localhost:9978", Path: "/blog"}
 	wsClient, _, err := websocket.DefaultDialer.Dial(wsURL.String(), nil)
 	require.NoError(t, err)

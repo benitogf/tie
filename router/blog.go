@@ -1,11 +1,12 @@
 package router
 
 import (
-	"github.com/benitogf/katamari/messages"
-	"net/http"
-	"github.com/benitogf/katamari/objects"
 	"encoding/json"
+	"net/http"
+
 	"github.com/benitogf/katamari"
+	"github.com/benitogf/katamari/messages"
+	"github.com/benitogf/katamari/objects"
 )
 
 func blogFilter(index string, data []byte) ([]byte, error) {
@@ -33,16 +34,16 @@ func blogFilter(index string, data []byte) ([]byte, error) {
 }
 
 func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request) {
-	client, err := server.Stream.New("posts/*", "blog", w, r)
+	client, err := server.Stream.New("posts/*", w, r)
 	if err != nil {
 		return
 	}
 
-	entry, err := server.Fetch("posts/*", "blog")
+	entry, err := server.Fetch("posts/*")
 	if err != nil {
 		return
 	}
 
 	go server.Stream.Write(client, messages.Encode(entry.Data), true, entry.Version)
-	server.Stream.Read("posts/*", "blog", client)
+	server.Stream.Read("posts/*", client)
 }
