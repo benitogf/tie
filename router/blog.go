@@ -3,6 +3,7 @@ package router
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/benitogf/katamari"
 	"github.com/benitogf/katamari/messages"
@@ -39,11 +40,11 @@ func blogStream(server *katamari.Server, w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	entry, err := server.Fetch("posts/*")
+	entries, err := server.Storage.Get("posts/*")
 	if err != nil {
 		return
 	}
 
-	go server.Stream.Write(client, messages.Encode(entry.Data), true, entry.Version)
+	go server.Stream.Write(client, messages.Encode(entries), true, time.Now().UnixNano())
 	server.Stream.Read("posts/*", client)
 }
