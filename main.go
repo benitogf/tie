@@ -15,6 +15,7 @@ import (
 )
 
 var key = flag.String("key", "a-secret-key", "secret key for tokens")
+var host = flag.String("host", "0.0.0.0", "host server address")
 var authPath = flag.String("authPath", "db/auth", "auth storage path")
 var dataPath = flag.String("dataPath", "db/data", "data storage path")
 var port = flag.Int("port", 8800, "service port")
@@ -48,6 +49,6 @@ func main() {
 	server.Router = mux.NewRouter()
 	router.Routes(server)
 	auth.Router(server)
-	server.Start("localhost:" + strconv.Itoa(*port))
+	server.Start(*host + ":" + strconv.Itoa(*port))
 	server.WaitClose()
 }
