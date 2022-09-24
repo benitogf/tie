@@ -1,9 +1,10 @@
 package router
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/benitogf/katamari"
 	"github.com/benitogf/katamari/messages"
