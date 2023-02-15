@@ -9,7 +9,7 @@ require (
 	github.com/goccy/go-json v0.9.11
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.5.0
-	github.com/prometheus/client_golang v1.11.0
+	github.com/prometheus/client_golang v1.11.1
 	github.com/stretchr/testify v1.8.0
 )
 
